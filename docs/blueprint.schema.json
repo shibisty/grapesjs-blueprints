@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/shibisty/grapesjs-scripts/docs/blueprint.schema.json",
+  "title": "Blueprint",
+  "type": "object",
+  "required": ["schema", "id", "name", "kind", "enabled", "variables", "nodes", "links"],
+  "properties": {
+    "schema": { "const": 1 },
+    "id": { "type": "string", "minLength": 1 },
+    "name": { "type": "string" },
+    "kind": { "enum": ["global", "template", "component"] },
+    "enabled": { "type": "boolean" },
+    "description": { "type": "string" },
+    "target": {
+      "type": "object",
+      "properties": {
+        "pages": { "type": "array", "items": { "type": "string" } },
+        "when": { "type": "string", "description": "CSS selector; the script runs only when the page has a match" }
+      },
+      "additionalProperties": false
+    },
+    "component": {
+      "type": ["object", "null"],
+      "required": ["type"],
+      "properties": {
+        "type": { "type": "string", "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)+$" },
+        "label": { "type": "string" },
+        "html": { "type": "string" },
+        "css": { "type": "string" },
+        "params": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "type"],
+            "properties": {
+              "id": { "type": "string", "pattern": "^[A-Za-z_$][\\w$]*$" },
+              "label": { "type": "string" },
+              "type": { "enum": ["string", "number", "boolean", "select"] },
+              "default": {},
+              "options": { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        }
+      }
+    },
+    "libraries": { "type": "array", "items": { "type": "string" } },
+    "variables": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "type"],
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "type": { "enum": ["any", "string", "number", "boolean", "element", "elements", "event", "object"] },
+          "default": {}
+        }
+      }
+    },
+    "nodes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "type", "pos"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "type": { "type": "string", "description": "Node type, e.g. dom.addClass" },
+          "pos": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 },
+          "props": { "type": "object", "description": "Settings and literal values of unconnected inputs, by id" },
+          "collapsed": { "type": "boolean" },
+          "disabled": { "type": "boolean" }
+        }
+      }
+    },
+    "links": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["from", "to"],
+        "properties": {
+          "from": { "type": "array", "items": { "type": "string" }, "minItems": 2, "maxItems": 2, "description": "[nodeId, outputPinId]" },
+          "to": { "type": "array", "items": { "type": "string" }, "minItems": 2, "maxItems": 2, "description": "[nodeId, inputPinId]" }
+        }
+      }
+    },
+    "comments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "text", "pos", "size"],
+        "properties": {
+          "id": { "type": "string" },
+          "text": { "type": "string" },
+          "pos": { "type": "array", "items": { "type": "number" } },
+          "size": { "type": "array", "items": { "type": "number" } },
+          "color": { "type": "string" }
+        }
+      }
+    },
+    "editor": { "type": "object", "description": "Viewport of the editor (pan, zoom)" }
+  }
+}

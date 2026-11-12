@@ -1,0 +1,32 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>grapesjs-scripts e2e</title>
+  <link rel="stylesheet" href="/node_modules/grapesjs/dist/css/grapes.min.css">
+  <style>body,html{margin:0;height:100%}</style>
+  <script src="/node_modules/grapesjs/dist/grapes.min.js"></script>
+  <script src="/node_modules/grapesjs-preset-webpage/dist/index.js"></script>
+  <script src="/dist/grapesjs-scripts.umd.cjs"></script>
+</head>
+<body>
+  <div id="gjs"></div>
+  <script>
+    window.errors = [];
+    window.addEventListener('error', (e) => window.errors.push(String(e.message)));
+    const lang = new URLSearchParams(location.search).get('lang') || 'en';
+    window.editor = grapesjs.init({
+      container: '#gjs',
+      height: '100%',
+      storageManager: false,
+      telemetry: false,
+      i18n: { locale: lang, detectLocale: false },
+      components: '<button class="js-popup-open" style="padding:12px 20px;margin:20px">Open popup</button><div id="popup" class="popup"><div class="popup__dialog"><button class="js-popup-close">×</button><p>Hello from the popup!</p></div></div>',
+      style: '.popup{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);align-items:center;justify-content:center}.popup.is-open{display:flex}.popup__dialog{background:#fff;padding:24px 32px;border-radius:8px;position:relative;font:16px sans-serif}.js-popup-close{position:absolute;top:6px;right:8px;border:0;background:none;font-size:20px;cursor:pointer}',
+      plugins: ['grapesjs-preset-webpage', (ed) => grapesjsScripts.default(ed, {
+        output: { urls: { terser: '/node_modules/terser/dist/bundle.min.js', obfuscator: '/node_modules/javascript-obfuscator/dist/index.browser.js' } },
+      })],
+    });
+  </script>
+</body>
+</html>
