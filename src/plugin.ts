@@ -252,25 +252,36 @@ export default function scriptsPlugin(editor: Editor, userOpts: ScriptsPluginOpt
     });
   }
 
+  /**
+   * Our panel button, unless another plugin manages it: a docking plugin
+   * (grapesjs-sidebar-tools) gives each view a context of its own, keeps
+   * the buttons idle and shows the views itself; following the command
+   * with the button there would stop the view again.
+   */
+  const ownButton = (): any => {
+    const b = panelButtons?.get(PANEL_BUTTON_ID);
+    return b && !b.get('context') ? b : null;
+  };
   editor.Commands.add(COMMANDS.open, {
     run() {
       wantOpen = true;
       if (!sidebar) return;
-      panelButtons?.forEach((b: any) => {
-        if (b.id === PANEL_BUTTON_ID) return;
+      // Our view replaces the others, unless they are docked next to it.
+      if (ownButton()) panelButtons?.forEach((b: any) => {
+        if (b.id === PANEL_BUTTON_ID || b.get('context')) return;
         if (b.get('active')) b.set('active', false);
         // A view opened by a command (not by its button) keeps running: stop it too.
         const cmd = b.get('command');
         if (typeof cmd === 'string' && editor.Commands.isActive(cmd)) editor.stopCommand(cmd);
       });
       sidebar.show();
-      const ours = panelButtons?.get(PANEL_BUTTON_ID);
+      const ours = ownButton();
       if (ours && !ours.get('active')) ours.set('active', true);
     },
     stop() {
       wantOpen = false;
       sidebar?.hide();
-      const ours = panelButtons?.get(PANEL_BUTTON_ID);
+      const ours = ownButton();
       if (ours?.get('active')) ours.set('active', false);
     },
   });
@@ -395,6 +406,8 @@ export default function scriptsPlugin(editor: Editor, userOpts: ScriptsPluginOpt
       // Another view was activated (click, or a preset opening the Style Manager on select).
       const onActive = (b: any) => {
         if (b.id === PANEL_BUTTON_ID || !b.get('active')) return;
+        // A view in another context (docked next to ours) does not replace it.
+        if (b.get('context') !== ours?.get('context')) return;
         if (ours?.get('active')) ours.set('active', false);
         if (sidebar?.isOpen) editor.stopCommand(COMMANDS.open);
       };
@@ -412,7 +425,12 @@ export default function scriptsPlugin(editor: Editor, userOpts: ScriptsPluginOpt
         container.appendChild(toggleBtn);
       }
     }
-    if (wantOpen) editor.runCommand(COMMANDS.open);
+    // The command may have run before the sidebar existed; GrapesJS then
+    // counts it as active and would skip a second run.
+    if (wantOpen) {
+      if (editor.Commands.isActive(COMMANDS.open)) sidebar.show();
+      else editor.runCommand(COMMANDS.open);
+    }
   };
 
   editor.onReady(() => {
