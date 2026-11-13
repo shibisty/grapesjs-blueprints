@@ -75,6 +75,13 @@ export interface OpenGraphOptions {
   labels?: Record<string, string>;
   /** Plugin texts (the selector picker). */
   t?: Translator;
+  /** Where to mount the editor (default: over the whole page, `document.body`). */
+  parent?: HTMLElement;
+  /**
+   * Around the selector picking: e.g. show the canvas while the editor is a
+   * workspace tab in the canvas' area. Called with `true` before, `false` after.
+   */
+  onPick?: (picking: boolean) => void;
 }
 
 /**
@@ -100,7 +107,17 @@ export function openGraphEditor(editor: Editor, manager: ScriptsManager, registr
     t: graphText(editor, o.labels),
     dir: isRtlLocale(getLocale(editor)) ? 'rtl' : 'ltr',
     pages: () => projectPages(editor),
-    pickSelector: o.t && editor.Canvas.getDocument?.() ? () => pickSelectorFlow(editor, o.t!, ge.root) : undefined,
+    pickSelector:
+      o.t && editor.Canvas.getDocument?.()
+        ? async () => {
+            o.onPick?.(true);
+            try {
+              return await pickSelectorFlow(editor, o.t!, ge.root);
+            } finally {
+              o.onPick?.(false);
+            }
+          }
+        : undefined,
     code: (b) => {
       // The JS as the plugin outputs it for this script.
       latest = b;
@@ -121,6 +138,7 @@ export function openGraphEditor(editor: Editor, manager: ScriptsManager, registr
       flush();
     },
   });
-  ge.mount(document.body);
+  if (o.parent) ge.root.classList.add('bpe--embedded');
+  ge.mount(o.parent || document.body);
   return ge;
 }

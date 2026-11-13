@@ -34,6 +34,13 @@ export interface ScriptsPluginOptions {
   exportHtml?: boolean;
   /** Block Manager category of component scripts (default: translated "Scripts"). */
   blocksCategory?: string;
+  /**
+   * With grapesjs-sidebar-tools 2.2+: open the blueprint editor as a tab of
+   * its workspace (next to the canvas, several at once) instead of over the
+   * whole page. Without sidebar-tools the editor covers the page as before.
+   * @default true
+   */
+  workspaceTabs?: boolean;
 }
 
 export type ResolvedOptions = Required<Omit<ScriptsPluginOptions, 'labels' | 'nodes' | 'graphLabels' | 'libraries' | 'output' | 'blocksCategory'>> & {
@@ -58,6 +65,7 @@ export function resolveOptions(o: ScriptsPluginOptions = {}): ResolvedOptions {
     output: o.output || {},
     preview: o.preview !== false,
     exportHtml: o.exportHtml !== false,
+    workspaceTabs: o.workspaceTabs !== false,
     blocksCategory: o.blocksCategory,
   } as ResolvedOptions;
 }

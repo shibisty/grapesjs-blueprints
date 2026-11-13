@@ -80,6 +80,8 @@ All 63 blocks: [docs/nodes.md](docs/nodes.md) ([по-русски](docs/nodes.ru
 | Edit | Ctrl+C / V / X / D, Delete, Ctrl+Z / Y; C puts a comment around the selection |
 | Pick a selector | the ⌖ button next to a selector field, then click the element in the page |
 
+The editor opens over the whole GrapesJS UI. With [grapesjs-sidebar-tools](https://www.npmjs.com/package/grapesjs-sidebar-tools) 2.2+ it opens in a **document tab** instead (one tab per script, next to the page tabs): switch between the page and its scripts without leaving the editor, split the workspace to keep the page and the graph side by side, close a tab with `×` or **Done**. While you pick a selector, a tab that shares its area with the canvas steps aside to show the page. Open tabs come back after a reload. `workspaceTabs: false` keeps the full-screen editor.
+
 Changes are saved to the script as you go. The **JavaScript** tab shows the exact output; clicking a `// n3 · …` line jumps to the block.
 
 ### Preview
@@ -136,6 +138,7 @@ A component script defines a GrapesJS component type (`bp-…`): its HTML, CSS a
 | `preview` | `true` | Run the scripts in the GrapesJS preview |
 | `exportHtml` | `true` | Wrap `editor.getHtml()` (see *Output*) |
 | `blocksCategory` | "Scripts" | Block Manager category of component scripts |
+| `workspaceTabs` | `true` | With grapesjs-sidebar-tools 2.2+: open the blueprint editor in a document tab (see *Blueprint editor*) |
 
 ## API
 

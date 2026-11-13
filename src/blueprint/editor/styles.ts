@@ -28,6 +28,7 @@ export const CATEGORY_COLORS: Record<string, string> = {
 
 export const EDITOR_CSS = `
 .bpe{position:fixed;inset:0;z-index:10000;display:flex;flex-direction:column;background:#1b1c1f;color:#d7d9dd;font:13px/1.35 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;text-align:start}
+.bpe.bpe--embedded{position:absolute;z-index:auto}
 .bpe *{box-sizing:border-box}
 .bpe button{font:inherit;color:inherit}
 .bpe input,.bpe select,.bpe textarea{font:inherit;color:inherit;background:#121315;border:1px solid #3a3d43;border-radius:3px;padding:4px 6px;min-width:0}

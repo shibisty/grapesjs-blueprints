@@ -12,6 +12,7 @@ import { ComponentBlueprints } from './integration/components';
 import { ScriptsExporter, type PageExport, type SiteExport } from './integration/export';
 import type { Library } from './core/libraries';
 import { openGraphEditor, graphText } from './ui/graph';
+import { currentWorkspace, docId as blueprintDocId, DOC_PREFIX as BLUEPRINT_DOC_PREFIX, onWorkspace, revealCanvas, type WorkspaceLike } from './integration/workspace';
 import { openLibraryDialog } from './ui/libraries';
 import { openCodeDialog, openCreateDialog } from './ui/modals';
 import { openSettingsDialog } from './ui/settings';
@@ -289,9 +290,114 @@ export default function scriptsPlugin(editor: Editor, userOpts: ScriptsPluginOpt
   editor.Commands.add(COMMANDS.export, { run: (_e: Editor, _s: unknown, o: { pageId?: string } = {}) => (o.pageId === undefined ? exporter!.exportSite() : exporter!.exportPage(o.pageId)) });
   editor.Commands.add(COMMANDS.build, { run: (_e: Editor, _s: unknown, o: BuildPageOptions = {}) => manager.build(o) });
   let graph: GraphEditor | null = null;
+
+  /* ---- blueprint editors as workspace tabs (grapesjs-sidebar-tools 2.2+) ---- */
+
+  /** Open editors of workspace tabs, by script id. */
+  const tabEditors = new Map<string, GraphEditor>();
+  let closingFromTab = false;
+
+  const openTab = (ws: WorkspaceLike, id: string, activate: boolean) => {
+    const bp = manager.get(id);
+    if (!bp) return;
+    const doc = blueprintDocId(id);
+    ws.open(
+      {
+        id: doc,
+        title: bp.name,
+        icon: iconHtml('graph', 14),
+        kind: 'element',
+        mount: (host) => {
+          if (opts.injectCss) injectCss();
+          let back: (() => void) | null = null;
+          const ge = openGraphEditor(editor, manager, registry, id, {
+            labels: opts.graphLabels,
+            t,
+            parent: host,
+            onPick: (picking) => {
+              if (picking) back = revealCanvas(ws, doc);
+              else back?.();
+            },
+          });
+          if (!ge) return;
+          tabEditors.set(id, ge);
+          graph = ge;
+          // "Done" in the editor closes the tab
+          ge.root.addEventListener(
+            'bpe:closed',
+            () => {
+              if (tabEditors.get(id) === ge) tabEditors.delete(id);
+              if (graph === ge) graph = null;
+              if (!closingFromTab && ws.has(doc)) ws.close(doc, { force: true });
+            },
+            { once: true },
+          );
+        },
+        onShow: () => tabEditors.get(id)?.renderWires(),
+        onClose: () => {
+          const ge = tabEditors.get(id);
+          if (!ge) return;
+          closingFromTab = true;
+          try {
+            ge.close(); // saves
+          } finally {
+            closingFromTab = false;
+          }
+        },
+        onClosed: () => {
+          const ge = tabEditors.get(id);
+          if (!ge) return;
+          closingFromTab = true;
+          try {
+            ge.close();
+          } finally {
+            closingFromTab = false;
+          }
+        },
+      },
+      { activate },
+    );
+  };
+
+  if (opts.workspaceTabs) {
+    // Tabs of the last session come back in the background (the editor is
+    // created when a tab is shown). The scripts may be loaded later than the
+    // workspace (project data of a page), so retry on every change.
+    let pending: string[] | null = null;
+    const restore = () => {
+      const ws = currentWorkspace(editor);
+      if (!ws || disposed || !pending?.length) return;
+      pending = pending.filter((id) => {
+        if (!manager.has(id)) return true;
+        if (!ws.has(blueprintDocId(id))) openTab(ws, id, false);
+        return false;
+      });
+    };
+    onWorkspace(editor, (ws) => {
+      if (disposed) return;
+      pending = ws.remembered(BLUEPRINT_DOC_PREFIX).map((doc) => doc.slice(BLUEPRINT_DOC_PREFIX.length));
+      restore();
+    });
+    on(EVENTS.change, restore);
+    on(EVENTS.update, (bp: Blueprint) => {
+      const ws = currentWorkspace(editor);
+      if (bp?.id && ws?.has(blueprintDocId(bp.id))) ws.update(blueprintDocId(bp.id), { title: bp.name });
+    });
+    on(EVENTS.remove, (bp: Blueprint) => {
+      const ws = currentWorkspace(editor);
+      if (bp?.id && ws?.has(blueprintDocId(bp.id))) ws.close(blueprintDocId(bp.id), { force: true });
+    });
+  }
+
   editor.Commands.add(COMMANDS.edit, {
     run: (_e: Editor, _s: unknown, o: { id?: string } = {}) => {
       if (!o.id || !manager.has(o.id)) return null;
+      const ws = opts.workspaceTabs ? currentWorkspace(editor) : null;
+      if (ws) {
+        openTab(ws, o.id, true);
+        editor.trigger(EVENTS.edit, { id: o.id });
+        return tabEditors.get(o.id) || null;
+      }
       graph?.close();
       if (opts.injectCss) injectCss();
       graph = openGraphEditor(editor, manager, registry, o.id, { labels: opts.graphLabels, t });
@@ -311,6 +417,8 @@ export default function scriptsPlugin(editor: Editor, userOpts: ScriptsPluginOpt
     if (disposed) return;
     disposed = true;
     graph?.close();
+    tabEditors.forEach((ge) => ge.close());
+    tabEditors.clear();
     runner?.stop();
     undoGetHtml?.();
     sidebar?.destroy();

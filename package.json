@@ -1,6 +1,6 @@
 {
   "name": "grapesjs-scripts",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "GrapesJS plugin: visual scripting with blueprints (node graphs compiled to plain JavaScript), CDN libraries and script output settings.",
   "type": "module",
   "main": "./dist/grapesjs-scripts.umd.cjs",
