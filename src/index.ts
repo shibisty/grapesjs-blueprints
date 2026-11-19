@@ -9,8 +9,11 @@ export { ScriptsManager, DEFAULT_SETTINGS, componentTypeFrom, isValidComponentTy
 export type { ScriptsData, ScriptsSettings, CreateScriptInit, BuildPageOptions, OutputMode } from './core/ScriptsManager';
 export { locales, SUPPORTED_LOCALES } from './i18n';
 export type { ScriptsLabels } from './i18n';
-export * from './blueprint';
-export { graphLocales } from './i18n/graph';
+// The blueprint library (re-exported for compatibility; prefer importing `blueprintsjs`).
+export * from 'blueprintsjs';
+export * from 'blueprintsjs/editor';
+export { locales as graphLocales } from 'blueprintsjs/locales';
+export { BANNER } from './core/ScriptsManager';
 export { libraryTags, normalizeLibrary, fileTypeOf } from './core/libraries';
 export type { Library, LibraryFile } from './core/libraries';
 export { cdnTools, processCode, DEFAULT_TOOL_URLS } from './core/output';

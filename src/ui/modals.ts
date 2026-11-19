@@ -1,5 +1,5 @@
 import type { Editor } from 'grapesjs';
-import type { BlueprintKind, Diagnostic } from '../blueprint';
+import type { BlueprintKind, Diagnostic } from 'blueprintsjs';
 import { componentTypeFrom, isValidComponentType, type CreateScriptInit, type ScriptsManager } from '../core/ScriptsManager';
 import type { Translator } from '../i18n';
 import { h } from './dom';

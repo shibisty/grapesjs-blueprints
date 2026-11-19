@@ -31,6 +31,20 @@ describe('plugin', () => {
     expect(btn.get('active')).toBe(false);
   });
 
+  it('views docked in contexts of their own (grapesjs-sidebar-tools) stay next to the scripts view', async () => {
+    s = await createEditor();
+    const { editor } = s;
+    const btns = editor.Panels.getPanel('views')!.get('buttons')!;
+    btns.forEach((b: any) => b.set('context', `dock-${b.id}`));
+    editor.runCommand('open-sm');
+    editor.runCommand(COMMANDS.open);
+    const root = document.querySelector<HTMLElement>('.gjscr')!;
+    expect(root.hidden).toBe(false);
+    expect(editor.Commands.isActive('open-sm')).toBe(true);
+    btns.get('open-layers')!.set('active', true);
+    expect(root.hidden).toBe(false);
+  });
+
   it('keeps working next to grapesjs-storage, whose cleanup hook is __gjssCleanup', async () => {
     s = await createEditor();
     const { editor, api } = s;

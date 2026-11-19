@@ -1,4 +1,4 @@
-import type { Blueprint } from '../../src/blueprint';
+import type { Blueprint } from 'blueprintsjs';
 
 /** Markup of the popup example (also used in docs/article-popup.md). */
 export const POPUP_HTML = `

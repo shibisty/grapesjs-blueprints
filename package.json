@@ -1,7 +1,7 @@
 {
   "name": "grapesjs-scripts",
   "version": "0.2.0",
-  "description": "GrapesJS plugin: visual scripting with blueprints (node graphs compiled to plain JavaScript), CDN libraries and script output settings.",
+  "description": "GrapesJS plugin: visual scripting with blueprints (node graphs compiled to plain JavaScript, powered by blueprintsjs), CDN libraries and script output settings.",
   "type": "module",
   "main": "./dist/grapesjs-scripts.umd.cjs",
   "module": "./dist/grapesjs-scripts.js",
@@ -14,10 +14,7 @@
       "import": "./dist/grapesjs-scripts.js",
       "require": "./dist/grapesjs-scripts.umd.cjs"
     },
-    "./blueprint": {
-      "types": "./dist/blueprint/index.d.ts",
-      "import": "./dist/blueprint.js"
-    }
+    "./package.json": "./package.json"
   },
   "files": [
     "dist",
@@ -27,12 +24,11 @@
   ],
   "sideEffects": false,
   "scripts": {
-    "build": "vite build && vite build --mode blueprint && tsc -p tsconfig.build.json",
+    "build": "vite build && vite build --mode umd && tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.test.json",
     "test": "vitest run",
     "test:watch": "vitest",
     "e2e": "node e2e/run.mjs && node e2e/graph.mjs && node e2e/features.mjs && node e2e/article.mjs",
-    "docs:nodes": "node scripts/gen-nodes.mjs",
     "docs:shots": "SHOTS=docs/img node e2e/article.mjs"
   },
   "keywords": [
@@ -44,6 +40,9 @@
     "no-code"
   ],
   "license": "MIT",
+  "dependencies": {
+    "blueprintsjs": "^0.2.0"
+  },
   "peerDependencies": {
     "grapesjs": ">=0.21.0"
   },

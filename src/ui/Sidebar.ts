@@ -1,5 +1,5 @@
 import type { Editor } from 'grapesjs';
-import type { Blueprint, BlueprintKind } from '../blueprint';
+import type { Blueprint, BlueprintKind } from 'blueprintsjs';
 import type { ScriptsManager } from '../core/ScriptsManager';
 import { EVENTS } from '../events';
 import { getLocale, isRtlLocale, type Translator } from '../i18n';

@@ -1,4 +1,4 @@
-import { buildScript, createRegistry, type Blueprint, type BuildOptions } from '../../src/blueprint';
+import { buildScript, createRegistry, type Blueprint, type BuildOptions } from 'blueprintsjs';
 
 export const registry = createRegistry();
 

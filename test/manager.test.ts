@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createRegistry } from '../src/blueprint';
+import { createRegistry } from 'blueprintsjs';
 import { DEFAULT_SETTINGS, ScriptsManager, componentTypeFrom, isValidComponentType } from '../src/core/ScriptsManager';
 import { POPUP_BLUEPRINT } from './fixtures/popup';
 

@@ -1,5 +1,5 @@
 import type { Editor } from 'grapesjs';
-import { buildStandalone, type Blueprint, type ComponentSpec, type NodeRegistry } from '../blueprint';
+import { buildStandalone, type Blueprint, type ComponentSpec, type NodeRegistry } from 'blueprintsjs';
 import type { ScriptsManager } from '../core/ScriptsManager';
 
 export const BLOCK_PREFIX = 'bp:';

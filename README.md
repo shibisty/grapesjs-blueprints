@@ -66,7 +66,7 @@ Without a bundler:
 - One wire per data input and per exec output (as in UE); several actions in a row — **Sequence**. An exec input takes any number of wires.
 - A **JavaScript** block runs your own code with typed inputs/outputs (optionally async); **Call function / Create object / Call method** use CDN libraries (`gsap.to`, `new Swiper(el, options)`).
 
-All 63 blocks: [docs/nodes.md](docs/nodes.md) ([по-русски](docs/nodes.ru.md)).
+All 63 blocks: [nodes.md](https://unpkg.com/blueprintsjs/docs/nodes.md) ([по-русски](https://unpkg.com/blueprintsjs/docs/nodes.ru.md)) in the blueprintsjs docs.
 
 ### Blueprint editor
 
@@ -161,19 +161,24 @@ getGraphEditor(), graphText(), registry, manager
 
 **Events:** `scripts:change` (`{ type, id }`), `scripts:add`, `scripts:update`, `scripts:remove`, `scripts:settings`, `scripts:edit`, `scripts:preview` (`{ running }`).
 
-## The blueprint library
+## The blueprint library: blueprintsjs
 
-Model, compiler and editor work without GrapesJS (`grapesjs-scripts/blueprint`):
+The model, the compiler, the 63 blocks and the graph editor live in a separate package, [blueprintsjs](https://www.npmjs.com/package/blueprintsjs), which works without GrapesJS. The plugin depends on it; the UMD build of the plugin includes it, the ES build imports it.
 
 ```js
-import { createRegistry, buildScript, GraphEditor } from 'grapesjs-scripts/blueprint';
+import { createRegistry, buildScript } from 'blueprintsjs';
+import { GraphEditor } from 'blueprintsjs/editor';
 
 const registry = createRegistry();
 const { code, diagnostics } = buildScript([blueprint], registry); // a self-starting ES5 script
 new GraphEditor({ blueprint, registry, onChange: (bp) => save(bp) }).mount();
 ```
 
-Writing your own blocks: [docs/custom-nodes.md](docs/custom-nodes.md). Blueprint format: [docs/schema.md](docs/schema.md).
+Everything blueprintsjs exports is also re-exported by `grapesjs-scripts` (as before), plus `graphLocales` (= `locales` of `blueprintsjs/locales`).
+
+- Writing your own blocks: [custom-nodes.md](https://unpkg.com/blueprintsjs/docs/custom-nodes.md); register them with the `nodes` option or `editor.Scripts.addNode(def)`.
+- Blueprint format: [schema.md](https://unpkg.com/blueprintsjs/docs/schema.md); how the plugin stores scripts in the project: [docs/project-data.md](docs/project-data.md).
+- Compiler, editor, translations: [blueprintsjs docs](https://unpkg.com/blueprintsjs/README.md).
 
 ## Security
 
@@ -182,12 +187,11 @@ A blueprint is code that runs on the published site; the **JavaScript** block an
 ## Development
 
 ```bash
-npm install
+npm install         # also links ../../../blueprintsjs (see package.json)
 npm run typecheck
 npm test            # vitest + jsdom, real GrapesJS
 npm run build
 npm run e2e         # headless Chrome: UI, editor, features, the article (CHROME=/path/to/chrome)
-node scripts/gen-nodes.mjs   # docs/nodes*.md from the registry
 ```
 
 ## License

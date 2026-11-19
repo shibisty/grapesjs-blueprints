@@ -1,4 +1,4 @@
-import { uid } from '../blueprint';
+import { uid } from 'blueprintsjs';
 
 export type LibraryFileType = 'js' | 'css';
 

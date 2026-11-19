@@ -1,4 +1,4 @@
-import type { NodeDef } from './blueprint';
+import type { NodeDef } from 'blueprintsjs';
 import type { OutputTools } from './core/output';
 import type { FetchLike } from './libs/providers';
 import type { ScriptsLabels } from './i18n/types';

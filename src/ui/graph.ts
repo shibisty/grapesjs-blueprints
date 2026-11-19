@@ -1,9 +1,9 @@
 import type { Editor } from 'grapesjs';
-import type { NodeRegistry } from '../blueprint';
-import { GraphEditor, type Text } from '../blueprint/editor';
+import type { NodeRegistry } from 'blueprintsjs';
+import { GraphEditor, type Text } from 'blueprintsjs/editor';
 import { isValidComponentType, type ScriptsManager } from '../core/ScriptsManager';
 import { getLocale, isRtlLocale } from '../i18n';
-import { graphLocales } from '../i18n/graph';
+import { locales as graphLocales } from 'blueprintsjs/locales';
 import { componentOf, pickElement, selectorCandidates, suggestHookClass } from '../integration/picker';
 import type { Translator } from '../i18n';
 import { h } from './dom';
@@ -137,8 +137,8 @@ export function openGraphEditor(editor: Editor, manager: ScriptsManager, registr
       latest = b;
       flush();
     },
+    embedded: !!o.parent,
   });
-  if (o.parent) ge.root.classList.add('bpe--embedded');
   ge.mount(o.parent || document.body);
   return ge;
 }

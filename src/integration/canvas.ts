@@ -1,5 +1,5 @@
 import type { Editor } from 'grapesjs';
-import { buildStandalone, type NodeRegistry } from '../blueprint';
+import { buildStandalone, type NodeRegistry } from 'blueprintsjs';
 import type { Library } from '../core/libraries';
 import type { ScriptsManager } from '../core/ScriptsManager';
 import { componentInstances } from './components';
