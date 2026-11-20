@@ -1,7 +1,9 @@
 import type { ScriptsLabels } from '../types';
+import { codeEn } from '../code';
 
 // Translated without a native speaker review.
 const zh: ScriptsLabels = {
+  ...codeEn,
   scripts: "脚本",
   newScript: "新建脚本",
   create: "创建",

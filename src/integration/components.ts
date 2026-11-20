@@ -1,6 +1,22 @@
 import type { Editor } from 'grapesjs';
-import { buildStandalone, type Blueprint, type ComponentSpec, type NodeRegistry } from '../blueprint';
+import { buildStandalone, type Blueprint, type ComponentSpec, type NodeRegistry } from 'blueprintsjs';
 import type { ScriptsManager } from '../core/ScriptsManager';
+import { jsSyntaxError, type CodeItem } from '../core/code';
+import { componentJs } from '../core/jsBundle';
+import { pagesComponentDef } from './pages';
+
+/**
+ * A component spec as this plugin keeps it: `pagesComponent` makes the content of a new
+ * instance a linked component of grapesjs-site-pages instead of `html`.
+ */
+export type ComponentSpecX = ComponentSpec & { pagesComponent?: string };
+export const pagesComponentOf = (spec: ComponentSpec | null | undefined): string => String((spec as ComponentSpecX | undefined)?.pagesComponent || '');
+
+/** What a component type is registered from: a component blueprint or a component JS item. */
+interface Source {
+  name: string;
+  description?: string;
+}
 
 export const BLOCK_PREFIX = 'bp:';
 export const TYPE_ATTR = 'data-bp';
@@ -23,6 +39,11 @@ function defaultFor(p: NonNullable<ComponentSpec['params']>[number]): unknown {
 export function componentScript(bp: Blueprint, registry: NodeRegistry): string {
   const run = buildStandalone(bp, registry, { comments: false }).code;
   return `function (props) {\n  if (this.__bpStop) return;\n  this.__bpStop = (${run})(this, { params: props || {} });\n}`;
+}
+
+/** The `script-export` of a component JS item (same contract as a blueprint's). */
+export function componentCodeScript(c: CodeItem): string {
+  return `function (props) {\n  if (this.__bpStop) return;\n  this.__bpStop = (${componentJs(c)})(this, { params: props || {} });\n}`;
 }
 
 /** All component models of a type in every page. */
@@ -53,15 +74,24 @@ export class ComponentBlueprints {
   ) {}
 
   sync(): void {
-    const bps = this.manager.list('component').filter((b) => b.component?.type);
+    const sources: Array<{ src: Source; spec: ComponentSpec; script: () => string; enabled: boolean }> = [
+      ...this.manager
+        .list('component')
+        .filter((b) => b.component?.type)
+        .map((b) => ({ src: b, spec: b.component!, script: () => componentScript(b, this.registry), enabled: b.enabled })),
+      ...this.manager
+        .listCode('js', 'component')
+        .filter((c) => c.component?.type)
+        // A component JS that does not parse keeps its type and block, without a script.
+        .map((c) => ({ src: c, spec: c.component!, script: () => (jsSyntaxError(c.code) ? '' : componentCodeScript(c)), enabled: c.enabled })),
+    ];
     const live = new Set<string>();
-    for (const bp of bps) {
-      const spec = bp.component!;
+    for (const { src, spec, script: make, enabled } of sources) {
       live.add(spec.type);
-      const script = bp.enabled ? componentScript(bp, this.registry) : '';
-      const sig = JSON.stringify([spec, script, bp.name]);
+      const script = enabled ? make() : '';
+      const sig = JSON.stringify([spec, script, src.name]);
       if (this.registered.get(spec.type) === sig) continue;
-      this.register(bp, spec, script);
+      this.register(src, spec, script);
       this.registered.set(spec.type, sig);
     }
     // Scripts deleted (or turned into another kind): their blocks go, the types stay so that
@@ -74,7 +104,7 @@ export class ComponentBlueprints {
     }
   }
 
-  private register(bp: Blueprint, spec: ComponentSpec, script: string) {
+  private register(bp: Source, spec: ComponentSpec, script: string) {
     const params = spec.params || [];
     const dc = this.editor.DomComponents as any;
     const type = spec.type;
@@ -82,7 +112,7 @@ export class ComponentBlueprints {
       tagName: 'div',
       name: spec.label || bp.name,
       attributes: { [TYPE_ATTR]: type },
-      components: spec.html || '',
+      components: pagesComponentOf(spec) ? [pagesComponentDef(pagesComponentOf(spec))] : spec.html || '',
       traits: [
         ...params.map((p) => ({
           name: p.id,

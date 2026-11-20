@@ -1,4 +1,4 @@
-import type { NodeDef } from './blueprint';
+import type { NodeDef } from 'blueprintsjs';
 import type { OutputTools } from './core/output';
 import type { FetchLike } from './libs/providers';
 import type { ScriptsLabels } from './i18n/types';
@@ -41,6 +41,12 @@ export interface ScriptsPluginOptions {
    * @default true
    */
   workspaceTabs?: boolean;
+  /**
+   * With grapesjs-site-pages 2.7+ (every record a whole project): keep the
+   * scripts once per site instead of in every page (`shared.register`).
+   * Default true; false keeps the old per-page copies.
+   */
+  sharedWithPages?: boolean;
 }
 
 export type ResolvedOptions = Required<Omit<ScriptsPluginOptions, 'labels' | 'nodes' | 'graphLabels' | 'libraries' | 'output' | 'blocksCategory'>> & {
@@ -66,6 +72,7 @@ export function resolveOptions(o: ScriptsPluginOptions = {}): ResolvedOptions {
     preview: o.preview !== false,
     exportHtml: o.exportHtml !== false,
     workspaceTabs: o.workspaceTabs !== false,
+    sharedWithPages: o.sharedWithPages !== false,
     blocksCategory: o.blocksCategory,
   } as ResolvedOptions;
 }

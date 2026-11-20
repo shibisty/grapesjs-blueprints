@@ -1,7 +1,9 @@
 import type { ScriptsLabels } from '../types';
+import { codeEn } from '../code';
 
 // Translated without a native speaker review.
 const ko: ScriptsLabels = {
+  ...codeEn,
   scripts: "스크립트",
   newScript: "새 스크립트",
   create: "만들기",

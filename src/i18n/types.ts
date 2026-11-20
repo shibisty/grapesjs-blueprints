@@ -1,5 +1,7 @@
+import type { CodeLabels } from './code';
+
 /** Every UI string of the plugin. `%s` placeholders are filled in order. */
-export interface ScriptsLabels {
+export interface ScriptsLabels extends CodeLabels {
   scripts: string;
   newScript: string;
   create: string;

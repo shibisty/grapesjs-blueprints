@@ -1,6 +1,8 @@
 import type { Editor } from 'grapesjs';
-import { createRegistry, diagnosticText, type GraphEditor, type Blueprint, type BlueprintKind, type BuildResult, type NodeDef, type NodeRegistry } from './blueprint';
+import { createRegistry, type Blueprint, type BlueprintKind, type BuildResult, type NodeDef, type NodeRegistry } from 'blueprintsjs';
+import { diagnosticText, type GraphEditor } from 'blueprintsjs/editor';
 import { ScriptsManager, type BuildPageOptions, type CreateScriptInit, type ScriptsSettings } from './core/ScriptsManager';
+import type { CodeItem, CodeLang, CreateCodeInit, PageScope } from './core/code';
 import { COMMANDS, EVENTS } from './events';
 import { createTranslator, registerMessages, type Translator } from './i18n';
 import { resolveOptions, type ScriptsPluginOptions } from './options';
@@ -8,13 +10,18 @@ import { h, icon, iconHtml } from './ui/dom';
 import { findHostPanel, findSidebarHost } from './ui/host';
 import { cdnTools } from './core/output';
 import { CanvasRunner } from './integration/canvas';
-import { ComponentBlueprints } from './integration/components';
-import { ScriptsExporter, type PageExport, type SiteExport } from './integration/export';
+import { ComponentBlueprints, pagesComponentOf, type ComponentSpecX } from './integration/components';
+import { pageIdOf, ScriptsExporter, type PageExport, type SiteExport } from './integration/export';
 import type { Library } from './core/libraries';
-import { openGraphEditor, graphText } from './ui/graph';
+import { openGraphEditor, graphText, pickSelectorFlow } from './ui/graph';
 import { currentWorkspace, docId as blueprintDocId, DOC_PREFIX as BLUEPRINT_DOC_PREFIX, onWorkspace, revealCanvas, type WorkspaceLike } from './integration/workspace';
+import { pagesComponents, pagesOf, ScopeTracker, shareWithPages } from './integration/pages';
+import { openRecordCodeDialog, type RecordRef } from './ui/recordCode';
+import { contentSelect } from './ui/content';
+import { CssItems } from './integration/cssItems';
 import { openLibraryDialog } from './ui/libraries';
-import { openCodeDialog, openCreateDialog } from './ui/modals';
+import { CodeEditorView } from './ui/codeEditor';
+import { openCodeDialog, openCreateDialog, openModal } from './ui/modals';
 import { openSettingsDialog } from './ui/settings';
 import { Sidebar } from './ui/Sidebar';
 import { injectCss } from './ui/styles';
@@ -51,8 +58,12 @@ export interface ScriptsApi {
   addLibrary(init: Partial<Library>): Library;
   updateLibrary(id: string, patch: Partial<Library>): Library;
   removeLibrary(id: string): boolean;
-  /** What a page needs: files and tags (minified/obfuscated as set). */
-  exportPage(pageId?: string): Promise<PageExport>;
+  /**
+   * What a page needs: files and tags (minified/obfuscated as set). A page id
+   * (`editor.Pages`, or a grapesjs-site-pages record id), or a page with its
+   * layout/template; default: the page shown.
+   */
+  exportPage(page?: string | PageScope): Promise<PageExport>;
   /** Every page: files once, tags per page. */
   exportSite(): Promise<SiteExport>;
   /** Start / stop the scripts in the canvas (normally done by the GrapesJS preview). */
@@ -62,6 +73,18 @@ export interface ScriptsApi {
   openLibraryDialog(): Promise<Library | null>;
   /** Text lookup used by the graph editor (current editor language). */
   graphText(): ReturnType<typeof graphText>;
+  /** Hand-written JS and CSS (same kinds and targets as blueprints). */
+  code: {
+    list(lang?: CodeLang, kind?: BlueprintKind): CodeItem[];
+    get(id: string): CodeItem | undefined;
+    create(init: CreateCodeInit): CodeItem;
+    update(id: string, patch: Partial<CodeItem> | ((c: CodeItem) => CodeItem)): CodeItem;
+    remove(id: string): boolean;
+    duplicate(id: string): CodeItem;
+    move(id: string, toIndex: number): void;
+    /** Enabled items of a language for a page: global ones, then the page's. */
+    for(lang: CodeLang, scope?: PageScope | string): CodeItem[];
+  };
   readonly registry: NodeRegistry;
   readonly manager: ScriptsManager;
 }
@@ -71,6 +94,8 @@ type EditorWithScripts = Editor & { Scripts?: ScriptsApi; __gjscrCleanup?: () =>
 export function getScripts(editor: Editor): ScriptsApi | undefined {
   return (editor as EditorWithScripts).Scripts;
 }
+
+const scopeFromPage = (id: string | undefined): PageScope | undefined => (id ? { id } : undefined);
 
 const isAlive = (editor: Editor) => {
   try {
@@ -97,9 +122,10 @@ export default function scriptsPlugin(editor: Editor, userOpts: ScriptsPluginOpt
   const manager = new ScriptsManager(registry, {
     defaultName: () => t('defaultName'),
     copySuffix: () => t('copySuffix'),
-    onChange: (type, bp) => {
+    onChange: (type, bp, code) => {
       if (!isAlive(editor)) return;
       if (type !== 'load') em?.changesUp?.({});
+      if (type === 'code' && code) editor.trigger(EVENTS.code, code);
       if (type === 'add') editor.trigger(EVENTS.add, bp);
       if (type === 'update') editor.trigger(EVENTS.update, bp);
       if (type === 'remove') editor.trigger(EVENTS.remove, bp);
@@ -107,7 +133,7 @@ export default function scriptsPlugin(editor: Editor, userOpts: ScriptsPluginOpt
       if (type === 'libraries' || type === 'load') runner?.syncLibraries();
       if (type !== 'settings' && type !== 'libraries') components?.sync();
       exporter?.refreshSoon();
-      editor.trigger(EVENTS.change, { type, id: bp?.id });
+      editor.trigger(EVENTS.change, { type, id: bp?.id ?? code?.item.id });
     },
   });
   // eslint-disable-next-line prefer-const
@@ -134,10 +160,17 @@ export default function scriptsPlugin(editor: Editor, userOpts: ScriptsPluginOpt
   } else {
     console.warn('[grapesjs-scripts] Editor storables not found: scripts will not be saved with the project.');
   }
+  // With grapesjs-site-pages: the scripts are site-wide, not copied into every page.
+  if (opts.sharedWithPages) shareWithPages(editor, opts.storageKey, (e) => console.error(e));
 
-  runner = new CanvasRunner(editor, manager, registry);
+  // The page shown: grapesjs-site-pages' open record (with its layout and template), else editor.Pages.
+  const tracker = new ScopeTracker(editor);
+  const scopeOf = (component?: any): PageScope | undefined => (component && !tracker.withPages ? scopeFromPage(pageIdOf(editor, component)) : tracker.scope());
+  runner = new CanvasRunner(editor, manager, registry, () => scopeOf());
+  // CSS items as GrapesJS rules of the page shown (Style Manager, getCss, publish).
+  const cssItems = new CssItems(editor, manager, () => scopeOf());
   components = new ComponentBlueprints(editor, manager, registry, () => opts.blocksCategory || t('blocksCategory'));
-  exporter = new ScriptsExporter(editor, manager, opts.output.tools || cdnTools(opts.output.urls));
+  exporter = new ScriptsExporter(editor, manager, opts.output.tools || cdnTools(opts.output.urls), scopeOf);
   const http = { fetch: opts.libraries.fetch || ((u: string, i?: RequestInit) => fetch(u, i)), proxy: opts.libraries.proxy ?? false, timeout: opts.libraries.timeout };
 
   let sidebar: Sidebar | null = null;
@@ -194,6 +227,162 @@ export default function scriptsPlugin(editor: Editor, userOpts: ScriptsPluginOpt
     if (window.confirm(t('confirmRemove', bp.name))) manager.remove(id);
   };
 
+  /* ---- JS / CSS items ---- */
+
+  /** Open code editors, by item id (one per item: a tab or the overlay). */
+  const codeEditors = new Map<string, CodeEditorView>();
+  const CODE_DOC_PREFIX = 'code:';
+  const codeDocId = (id: string) => `${CODE_DOC_PREFIX}${id}`;
+
+  const newCodeEditor = (id: string, parent?: HTMLElement): CodeEditorView => {
+    if (opts.injectCss) injectCss();
+    const view: CodeEditorView = new CodeEditorView(editor, manager, id, {
+      t,
+      parent,
+      choices: () => tracker.choices(),
+      cssRules: (code) => cssItems.ruleCount(code),
+      pagesComponents: () => pagesComponents(editor),
+      pickSelector: async () => {
+        const ws = parent ? currentWorkspace(editor) : null;
+        const back = ws ? revealCanvas(ws, codeDocId(id)) : () => undefined;
+        try {
+          return await pickSelectorFlow(editor, t, view.root);
+        } finally {
+          back();
+        }
+      },
+      onClosed: () => {
+        if (codeEditors.get(id) === view) codeEditors.delete(id);
+        const ws = currentWorkspace(editor);
+        if (parent && ws?.has(codeDocId(id)) && !closingCodeTab) ws.close(codeDocId(id), { force: true });
+      },
+    });
+    codeEditors.set(id, view);
+    return view;
+  };
+  let closingCodeTab = false;
+
+  /** Opens the editor of a JS/CSS item: a workspace tab with grapesjs-sidebar-tools, else over the page. */
+  const editCode = (id: string, activate = true): CodeEditorView | null => {
+    const item = manager.getCode(id);
+    if (!item) return null;
+    const ws = opts.workspaceTabs ? currentWorkspace(editor) : null;
+    if (ws) {
+      const doc = codeDocId(id);
+      if (ws.has(doc)) {
+        if (activate) ws.activate(doc);
+      } else {
+        ws.open(
+          {
+            id: doc,
+            title: item.name,
+            tooltip: `${item.lang.toUpperCase()} · ${item.name}`,
+            kind: 'element',
+            mount: (container) => void newCodeEditor(id, container),
+            onShow: () => codeEditors.get(id)?.refresh(),
+            onClosed: () => {
+              closingCodeTab = true;
+              try {
+                codeEditors.get(id)?.close();
+              } finally {
+                closingCodeTab = false;
+              }
+            },
+          },
+          { activate },
+        );
+      }
+      return codeEditors.get(id) || null;
+    }
+    codeEditors.forEach((v) => !v.root.classList.contains('gjscr-ce--embedded') && v.close());
+    return newCodeEditor(id);
+  };
+
+  const createCode = (lang: CodeLang, kind?: BlueprintKind): CodeItem => {
+    const item = manager.createCode({ lang, kind });
+    editCode(item.id);
+    return item;
+  };
+  const renameCode = (id: string) => {
+    const c = manager.getCode(id);
+    if (!c) return;
+    const name = window.prompt(t('promptName'), c.name);
+    if (name != null && name.trim()) manager.updateCode(id, { name: name.trim() });
+  };
+  const removeCode = (id: string) => {
+    const c = manager.getCode(id);
+    if (c && window.confirm(t('confirmRemoveCode', c.name))) manager.removeCode(id);
+  };
+
+  /* ---- with grapesjs-site-pages: components and records ---- */
+
+  /** A component blueprint's content: its HTML, or a linked component of pages. */
+  const chooseContent = (id: string): void => {
+    const bp = manager.get(id);
+    if (!bp || bp.kind !== 'component' || !bp.component) return;
+    let value = pagesComponentOf(bp.component);
+    const sel = contentSelect(t, pagesComponents(editor), value, (v) => (value = v));
+    const done = () => {
+      const cur = manager.get(id);
+      if (cur?.component) {
+        const spec: ComponentSpecX = { ...cur.component };
+        if (value) spec.pagesComponent = value;
+        else delete spec.pagesComponent;
+        manager.update(id, { component: spec });
+      }
+      (editor.Modal as any).close();
+    };
+    const body = h(
+      'div',
+      { class: 'gjscr-modal' },
+      h('div', { class: 'gjscr-field' }, h('span', { class: 'gjscr-label' }, t('componentContent')), sel, h('small', { class: 'gjscr-hint' }, t('pagesComponentHint'))),
+      h(
+        'div',
+        { class: 'gjscr-actions' },
+        h('button', { type: 'button', class: 'gjscr-secondary', onclick: () => (editor.Modal as any).close() }, t('cancel')),
+        h('button', { type: 'button', class: 'gjscr-primary', 'data-role': 'apply', onclick: done }, t('done')),
+      ),
+    );
+    if (opts.injectCss) injectCss();
+    openModal(editor, `${t('componentContentAction')}: ${bp.name}`, body);
+  };
+
+  /** "Scripts & styles" of a pages record. */
+  const recordCode = (rec: RecordRef): void => {
+    if (opts.injectCss) injectCss();
+    openRecordCodeDialog(editor, manager, t, rec, {
+      createHere: (lang) => {
+        const item = manager.createCode({ lang, kind: 'template', target: { pages: [rec.id] } });
+        editCode(item.id);
+      },
+      edit: (id) => editCode(id),
+    });
+  };
+  on('pages-manager:record-actions', ({ record, actions }: { record: RecordRef & { deleted?: boolean }; actions: any[] }) => {
+    const kind = record?.kind || 'page';
+    if (!record || record.deleted || !['page', 'layout', 'template'].includes(kind) || !Array.isArray(actions)) return;
+    actions.push({ id: 'scripts', label: t('scriptsAndStyles'), icon: '{}', run: (r: RecordRef) => recordCode(r) });
+  });
+  // The component content action shows only while pages has components.
+  on('pages-manager:components', () => sidebar?.renderSoon());
+
+  /** Our component types as starting points of new pages components. */
+  const pagesSource = () => {
+    const p = pagesOf(editor);
+    if (!p?.components?.addSource) return;
+    const types = () => [
+      ...manager.list('component').filter((b) => b.component?.type).map((b) => ({ id: b.component!.type, name: b.component!.label || b.name })),
+      ...manager.listCode('js', 'component').filter((c) => c.component?.type).map((c) => ({ id: c.component!.type, name: c.component!.label || c.name })),
+    ];
+    const off = p.components.addSource({
+      id: 'blueprints',
+      label: t('tabBlueprints'),
+      list: types,
+      build: (type) => ({ type }),
+    });
+    offs.push(off);
+  };
+
   const addLibraryDialog = () => openLibraryDialog(editor, manager, t, http);
   const openSettings = () =>
     openSettingsDialog(editor, manager, t, exporter!, () => {
@@ -233,6 +422,16 @@ export default function scriptsPlugin(editor: Editor, userOpts: ScriptsPluginOpt
     openSettings: () => void openSettings(),
     openLibraryDialog: () => addLibraryDialog(),
     graphText: () => graphText(editor, opts.graphLabels),
+    code: {
+      list: (lang, kind) => manager.listCode(lang, kind),
+      get: (id) => manager.getCode(id),
+      create: (init) => manager.createCode(init),
+      update: (id, patch) => manager.updateCode(id, patch),
+      remove: (id) => manager.removeCode(id),
+      duplicate: (id) => manager.duplicateCode(id),
+      move: (id, i) => manager.moveCode(id, i),
+      for: (lang, scope) => manager.codeFor(lang, typeof scope === 'string' ? { pageId: scope } : { scope }),
+    },
     registry,
     manager,
   };
@@ -297,6 +496,8 @@ export default function scriptsPlugin(editor: Editor, userOpts: ScriptsPluginOpt
   });
   editor.Commands.add(COMMANDS.code, { run: (_e: Editor, _s: unknown, o: { id?: string } = {}) => openCode(o.id) });
   editor.Commands.add(COMMANDS.settings, { run: () => openSettings() });
+  editor.Commands.add(COMMANDS.editCode, { run: (_e: Editor, _s: unknown, o: { id?: string } = {}) => (o.id ? editCode(o.id) : null) });
+  editor.Commands.add(COMMANDS.createCode, { run: (_e: Editor, _s: unknown, o: { lang?: CodeLang; kind?: BlueprintKind } = {}) => createCode(o.lang === 'css' ? 'css' : 'js', o.kind) });
   editor.Commands.add(COMMANDS.libraries, { run: () => addLibraryDialog() });
   editor.Commands.add(COMMANDS.export, { run: (_e: Editor, _s: unknown, o: { pageId?: string } = {}) => (o.pageId === undefined ? exporter!.exportSite() : exporter!.exportPage(o.pageId)) });
   editor.Commands.add(COMMANDS.build, { run: (_e: Editor, _s: unknown, o: BuildPageOptions = {}) => manager.build(o) });
@@ -398,6 +599,29 @@ export default function scriptsPlugin(editor: Editor, userOpts: ScriptsPluginOpt
       const ws = currentWorkspace(editor);
       if (bp?.id && ws?.has(blueprintDocId(bp.id))) ws.close(blueprintDocId(bp.id), { force: true });
     });
+    // Code tabs: the same — back after a reload, renamed and closed with their item.
+    let pendingCode: string[] | null = null;
+    const restoreCode = () => {
+      if (!currentWorkspace(editor) || disposed || !pendingCode?.length) return;
+      pendingCode = pendingCode.filter((id) => {
+        if (!manager.getCode(id)) return true;
+        editCode(id, false);
+        return false;
+      });
+    };
+    onWorkspace(editor, (ws) => {
+      if (disposed) return;
+      pendingCode = ws.remembered(CODE_DOC_PREFIX).map((doc) => doc.slice(CODE_DOC_PREFIX.length));
+      restoreCode();
+    });
+    on(EVENTS.change, restoreCode);
+    on(EVENTS.code, (p: { action: string; item: CodeItem }) => {
+      const ws = currentWorkspace(editor);
+      const doc = p?.item ? codeDocId(p.item.id) : '';
+      if (!ws || !doc || !ws.has(doc)) return;
+      if (p.action === 'remove') ws.close(doc, { force: true });
+      else ws.update(doc, { title: p.item.name, tooltip: `${p.item.lang.toUpperCase()} · ${p.item.name}` });
+    });
   }
 
   editor.Commands.add(COMMANDS.edit, {
@@ -430,7 +654,11 @@ export default function scriptsPlugin(editor: Editor, userOpts: ScriptsPluginOpt
     graph?.close();
     tabEditors.forEach((ge) => ge.close());
     tabEditors.clear();
+    codeEditors.forEach((v) => v.close());
+    codeEditors.clear();
     runner?.stop();
+    cssItems.destroy();
+    tracker.destroy();
     undoGetHtml?.();
     sidebar?.destroy();
     toggleBtn?.remove();
@@ -490,6 +718,19 @@ export default function scriptsPlugin(editor: Editor, userOpts: ScriptsPluginOpt
       },
       edit: (id) => editor.runCommand(COMMANDS.edit, { id }),
       code: (id) => openCode(id),
+      createCode: (lang, kind) => void createCode(lang, kind),
+      editCode: (id) => void editor.runCommand(COMMANDS.editCode, { id }),
+      toggleCode: (id) => {
+        const c = manager.getCode(id);
+        if (c) manager.updateCode(id, { enabled: !c.enabled });
+      },
+      renameCode,
+      duplicateCode: (id) => void manager.duplicateCode(id),
+      removeCode,
+      targetNames: () => new Map(tracker.choices().map((c) => [c.id, c.name])),
+      cssRules: (code) => cssItems.ruleCount(code),
+      canLink: () => pagesComponents(editor).length > 0,
+      componentContent: chooseContent,
       rename,
       duplicate: (id) => manager.duplicate(id),
       remove,
@@ -544,6 +785,7 @@ export default function scriptsPlugin(editor: Editor, userOpts: ScriptsPluginOpt
   editor.onReady(() => {
     if (disposed || !isAlive(editor)) return;
     mountUi();
+    pagesSource();
     components?.sync();
     runner?.syncLibraries();
   });

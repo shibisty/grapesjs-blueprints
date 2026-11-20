@@ -1,8 +1,11 @@
 import type { Editor } from 'grapesjs';
-import type { BlueprintKind, Diagnostic } from '../blueprint';
+import type { BlueprintKind, Diagnostic } from 'blueprintsjs';
 import { componentTypeFrom, isValidComponentType, type CreateScriptInit, type ScriptsManager } from '../core/ScriptsManager';
 import type { Translator } from '../i18n';
+import { contentSelect } from './content';
 import { h } from './dom';
+import type { ComponentSpecX } from '../integration/components';
+import { pagesComponents } from '../integration/pages';
 import { highlight } from './highlight';
 
 /** Pages of the project (`editor.Pages`): id and a readable name. */
@@ -106,11 +109,23 @@ export function openCreateDialog(
       oninput: () => (typeEdited = true),
     });
     const clabel = h('input', { class: 'gjscr-input', type: 'text', id: 'gjscr-clabel', autocomplete: 'off' });
+    const linkable = pagesComponents(editor);
+    let linked = '';
+    const content = linkable.length
+      ? h(
+          'div',
+          { class: 'gjscr-field' },
+          h('span', { class: 'gjscr-label' }, t('componentContent')),
+          contentSelect(t, linkable, '', (id) => (linked = id)),
+          h('small', { class: 'gjscr-hint' }, t('pagesComponentHint')),
+        )
+      : null;
     const componentBox = h(
       'div',
       {},
       h('div', { class: 'gjscr-field' }, h('label', { for: 'gjscr-ctype' }, t('componentType')), ctype),
       h('div', { class: 'gjscr-field' }, h('label', { for: 'gjscr-clabel' }, t('componentLabel')), clabel),
+      content,
     );
     const suggestType = () => {
       if (typeEdited) return;
@@ -156,7 +171,7 @@ export function openCreateDialog(
           ctype.focus();
           return;
         }
-        init.component = { type, label: clabel.value.trim() || undefined };
+        init.component = { type, label: clabel.value.trim() || undefined, ...(linked ? { pagesComponent: linked } : {}) } as ComponentSpecX;
       }
       finish(init);
       (editor.Modal as any).close();

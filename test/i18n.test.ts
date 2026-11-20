@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { locales } from '../src/i18n';
-import { graphLocales } from '../src/i18n/graph';
-import { BUILTIN_NODES } from '../src/blueprint';
+import { graphLocales, BUILTIN_NODES } from '../src/index';
 
 const placeholders = (s: string) => (s.match(/%s/g) || []).length;
 

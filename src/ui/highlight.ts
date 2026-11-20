@@ -1,7 +1,7 @@
-import { highlight as hl } from '../blueprint/editor/highlight';
+import { highlight as hl } from 'blueprintsjs/editor';
 
-export { tokenize } from '../blueprint/editor/highlight';
-export type { TokenKind } from '../blueprint/editor/highlight';
+export { tokenize } from 'blueprintsjs/editor';
+export type { TokenKind } from 'blueprintsjs/editor';
 
 /** Code view of the plugin dialogs (`gjscr-` classes). */
 export const highlight = (code: string): HTMLElement => hl(code, 'gjscr');

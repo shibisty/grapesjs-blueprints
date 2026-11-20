@@ -159,6 +159,7 @@ try {
 
   // ------------------------------------------------------------ libraries
   await api(() => window.editor.runCommand('scripts:open'));
+  await page.click('.gjscr-stab[data-tab="libraries"]'); // libraries have their own tab (0.3)
   await page.locator('.gjscr-section[data-kind="libraries"] .gjscr-act').click();
   await page.waitForSelector('.gjscr-libdialog');
   await shot(page, 'libraries');

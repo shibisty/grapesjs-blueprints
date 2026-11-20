@@ -1,7 +1,9 @@
 import type { ScriptsLabels } from '../types';
+import { codeEn } from '../code';
 
 // Translated without a native speaker review.
 const bs: ScriptsLabels = {
+  ...codeEn,
   scripts: "Skripte",
   newScript: "Nova skripta",
   create: "Kreiraj",

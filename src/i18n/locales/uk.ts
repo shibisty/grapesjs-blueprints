@@ -1,6 +1,8 @@
 import type { ScriptsLabels } from '../types';
+import { codeUk } from '../code';
 
 const uk: ScriptsLabels = {
+  ...codeUk,
   scripts: 'Скрипти',
   newScript: 'Новий скрипт',
   create: 'Створити',

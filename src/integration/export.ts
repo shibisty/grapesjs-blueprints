@@ -2,6 +2,11 @@ import type { Editor } from 'grapesjs';
 import { libraryTags } from '../core/libraries';
 import { inlineSafe, processCode, type OutputTools } from '../core/output';
 import type { ScriptsManager } from '../core/ScriptsManager';
+import type { PageScope } from '../core/code';
+
+/** Where a page script applies: an `editor.Pages` id, or a page with its layout/template. */
+export type PageRef = string | PageScope | undefined;
+const toScope = (p: PageRef): PageScope | undefined => (typeof p === 'string' ? { id: p } : p);
 
 export interface PageExport {
   pageId?: string;
@@ -62,20 +67,22 @@ export class ScriptsExporter {
     private readonly editor: Editor,
     private readonly manager: ScriptsManager,
     private readonly tools: OutputTools,
+    /** The page shown (or the page of a component): grapesjs-site-pages' record, else `editor.Pages`. */
+    private readonly scopeOf: (component?: any) => PageScope | undefined = (c) => toScope(pageIdOf(editor, c)),
   ) {}
 
-  /** Raw (readable) code of the shared script and of a page's own script. */
-  private raw(pageId?: string): { shared: string | null; page: string | null; warnings: string[] } {
-    const shared = this.manager.build({ only: 'shared' });
-    const page = pageId ? this.manager.build({ only: 'page', pageId }) : null;
+  /** Raw (readable) code of the shared script and of a page's own script: blueprints + JS items. */
+  private raw(scope?: PageScope): { shared: string | null; page: string | null; warnings: string[] } {
+    const shared = this.manager.buildJs({ only: 'shared' });
+    const page = scope ? this.manager.buildJs({ only: 'page', scope }) : null;
     const warnings = [...shared.diagnostics, ...(page?.diagnostics || [])]
       .filter((d) => d.severity === 'error')
-      .map((d) => `${this.manager.get(d.blueprintId)?.name || d.blueprintId}: ${d.message}`);
-    return {
-      shared: shared.blueprints.length ? shared.code : null,
-      page: page && page.blueprints.length ? page.code : null,
-      warnings,
-    };
+      .map((d) => {
+        const name = 'codeId' in d ? this.manager.getCode(d.codeId)?.name || d.codeId : this.manager.get(d.blueprintId)?.name || d.blueprintId;
+        return `${name}: ${d.message}`;
+      });
+    const has = (r: { blueprints: number; items: number } | null) => !!r && r.blueprints + r.items > 0;
+    return { shared: has(shared) ? shared.code : null, page: page && has(page) ? page.code : null, warnings };
   }
 
   private key(code: string): string {
@@ -114,9 +121,10 @@ export class ScriptsExporter {
     return hit ?? code;
   }
 
-  private assemble(pageId: string | undefined, shared: string | null, page: string | null, warnings: string[]): PageExport {
+  private assemble(scope: PageScope | undefined, shared: string | null, page: string | null, warnings: string[]): PageExport {
     const s = this.manager.settings;
-    const out: PageExport = { pageId, files: [], libraries: libraryTags(this.manager.librariesFor(pageId)), scripts: '', warnings };
+    const pageId = scope?.id;
+    const out: PageExport = { pageId, files: [], libraries: libraryTags(this.manager.librariesFor(scope)), scripts: '', warnings };
     const tags: string[] = [];
     if (s.output === 'inline') {
       for (const code of [shared, page]) if (code) tags.push(`<script>\n${inlineSafe(code.trim())}\n</script>`);
@@ -135,17 +143,19 @@ export class ScriptsExporter {
     return out;
   }
 
-  /** Everything one page needs, post-processed. */
-  async exportPage(pageId: string | undefined = pageIdOf(this.editor)): Promise<PageExport> {
-    const r = this.raw(pageId);
-    const [shared, page] = await Promise.all([r.shared ? this.process(r.shared) : null, r.page ? this.process(r.page) : null]);
-    return this.assemble(pageId, shared, page, [...r.warnings, ...this.lastWarnings]);
+  /** Everything one page needs, post-processed (default: the page shown). */
+  async exportPage(page: PageRef = this.scopeOf()): Promise<PageExport> {
+    const scope = toScope(page);
+    const r = this.raw(scope);
+    const [shared, own] = await Promise.all([r.shared ? this.process(r.shared) : null, r.page ? this.process(r.page) : null]);
+    return this.assemble(scope, shared, own, [...r.warnings, ...this.lastWarnings]);
   }
 
   /** Same, synchronously: post-processed code if ready, the readable code otherwise. */
-  exportPageSync(pageId: string | undefined = pageIdOf(this.editor)): PageExport {
-    const r = this.raw(pageId);
-    return this.assemble(pageId, r.shared ? this.processedSync(r.shared) : null, r.page ? this.processedSync(r.page) : null, r.warnings);
+  exportPageSync(page: PageRef = this.scopeOf()): PageExport {
+    const scope = toScope(page);
+    const r = this.raw(scope);
+    return this.assemble(scope, r.shared ? this.processedSync(r.shared) : null, r.page ? this.processedSync(r.page) : null, r.warnings);
   }
 
   /** All pages: files (each once) and the tags of every page. */
@@ -182,7 +192,7 @@ export class ScriptsExporter {
     ed.getHtml = (opts?: any) => {
       const html = original.call(ed, opts);
       if (!this.manager.settings.includeInHtml || typeof html !== 'string') return html;
-      const e = this.exportPageSync(pageIdOf(this.editor, opts?.component));
+      const e = this.exportPageSync(this.scopeOf(opts?.component));
       const tags = [e.libraries, e.scripts].filter(Boolean).join('\n');
       if (!tags) return html;
       const i = html.lastIndexOf('</body>');

@@ -1,7 +1,9 @@
 import type { Editor } from 'grapesjs';
-import { buildStandalone, type NodeRegistry } from '../blueprint';
+import { buildStandalone, type NodeRegistry } from 'blueprintsjs';
 import type { Library } from '../core/libraries';
 import type { ScriptsManager } from '../core/ScriptsManager';
+import { jsSyntaxError, type PageScope } from '../core/code';
+import { componentJs } from '../core/jsBundle';
 import { componentInstances } from './components';
 import { pageIdOf } from './export';
 
@@ -67,6 +69,11 @@ export class CanvasRunner {
     private readonly editor: Editor,
     private readonly manager: ScriptsManager,
     private readonly registry: NodeRegistry,
+    /** The page shown: grapesjs-site-pages' record (with layout/template), else `editor.Pages`. */
+    private readonly scopeOf: () => PageScope | undefined = () => {
+      const id = pageIdOf(editor);
+      return id ? { id } : undefined;
+    },
   ) {}
 
   get isRunning(): boolean {
@@ -83,7 +90,7 @@ export class CanvasRunner {
   syncLibraries(): void {
     const f = this.frame();
     if (!f) return;
-    const libs = this.manager.librariesFor(pageIdOf(this.editor));
+    const libs = this.manager.librariesFor(this.scopeOf());
     syncCanvasCss(f.doc, libs);
     const always = libs.filter((l) => l.inCanvas);
     if (always.length) void loadIntoFrame(f.doc, always, { css: false });
@@ -103,14 +110,20 @@ export class CanvasRunner {
     const f = this.frame();
     if (!f) return;
     this.running = true;
-    const pageId = pageIdOf(this.editor);
-    await loadIntoFrame(f.doc, this.manager.librariesFor(pageId));
+    const scope = this.scopeOf();
+    await loadIntoFrame(f.doc, this.manager.librariesFor(scope));
     if (!this.running) return; // stopped while loading
-    const page = this.manager.build({ target: 'preview', pageId });
-    const fns = this.manager
-      .list('component')
-      .filter((b) => b.enabled && b.component?.type)
-      .map((b) => `${JSON.stringify(b.component!.type)}: ${buildStandalone(b, this.registry, { comments: false }).code}`);
+    const page = this.manager.buildJs({ target: 'preview', scope });
+    const fns = [
+      ...this.manager
+        .list('component')
+        .filter((b) => b.enabled && b.component?.type)
+        .map((b) => `${JSON.stringify(b.component!.type)}: ${buildStandalone(b, this.registry, { comments: false }).code}`),
+      ...this.manager
+        .listCode('js', 'component')
+        .filter((c) => c.enabled && c.component?.type && !jsSyntaxError(c.code))
+        .map((c) => `${JSON.stringify(c.component!.type)}: ${componentJs(c)}`),
+    ];
     f.win.__bpPreview = null;
     this.evalInFrame(f, `window.__bpPreview = { page: ${page.code}, components: { ${fns.join(',\n')} } };`);
     const api = f.win.__bpPreview as { page: (d: Document) => () => void; components: Record<string, (el: Element, ctx: unknown) => () => void> } | null;
