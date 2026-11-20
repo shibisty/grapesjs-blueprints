@@ -736,8 +736,9 @@ function scriptsPlugin(editor: Editor, userOpts: ScriptsPluginOptions = {}): voi
   on('component:add component:remove', () => {
     if (!manager.libraries().some((l) => (l.pages || []).some((r) => r.replace(/^!/, '').startsWith('component:')))) return;
     clearTimeout(libSync);
-    libSync = setTimeout(() => runner?.syncLibraries(), 50);
+    libSync = setTimeout(() => !disposed && runner?.syncLibraries(), 50);
   });
+  offs.push(() => clearTimeout(libSync));
   if (opts.preview) {
     on('run:core:preview', () => void runner?.start().catch((e) => console.error('[grapesjs-scripts]', e)));
     on('stop:core:preview', () => {

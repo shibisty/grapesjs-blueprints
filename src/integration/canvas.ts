@@ -81,8 +81,10 @@ export class CanvasRunner {
   }
 
   private frame(): { doc: Document; win: Window & Record<string, any> } | null {
-    const doc = this.editor.Canvas.getDocument?.() as Document | undefined;
-    const win = this.editor.Canvas.getWindow?.() as (Window & Record<string, any>) | undefined;
+    // The editor may be gone (destroyed) by the time a deferred sync runs.
+    const canvas = (this.editor as any)?.Canvas;
+    const doc = canvas?.getDocument?.() as Document | undefined;
+    const win = canvas?.getWindow?.() as (Window & Record<string, any>) | undefined;
     return doc && win ? { doc, win } : null;
   }
 
