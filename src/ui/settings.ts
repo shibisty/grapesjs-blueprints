@@ -3,11 +3,18 @@ import type { ScriptsManager, ScriptsSettings } from '../core/ScriptsManager';
 import type { Translator } from '../i18n';
 import type { ScriptsExporter } from '../integration/export';
 import { h } from './dom';
-import { librariesEditor } from './libraries';
+import { librariesEditor, type LibraryScope } from './libraries';
 import { copyText, download, openModal, projectPages } from './modals';
 
 /** Settings: output (file/inline, minify, obfuscate…), export, CDN libraries. */
-export function openSettingsDialog(editor: Editor, manager: ScriptsManager, t: Translator, exporter: ScriptsExporter, addLibrary: () => void): HTMLElement {
+export function openSettingsDialog(
+  editor: Editor,
+  manager: ScriptsManager,
+  t: Translator,
+  exporter: ScriptsExporter,
+  addLibrary: () => void,
+  scope: LibraryScope = { withPages: false, choices: () => projectPages(editor).map((p) => ({ ...p, group: 'page' as const })) },
+): HTMLElement {
   const s = manager.settings;
   const set = (patch: Partial<ScriptsSettings>) => manager.setSettings(patch);
   const radio = (value: ScriptsSettings['output'], label: string, hint: string) =>
@@ -56,7 +63,7 @@ export function openSettingsDialog(editor: Editor, manager: ScriptsManager, t: T
     exportBox.replaceChildren(...(kids.filter(Boolean) as Node[]));
   };
 
-  const libs = librariesEditor(editor, manager, t, projectPages(editor), addLibrary);
+  const libs = librariesEditor(editor, manager, t, scope, addLibrary);
   const root = h(
     'div',
     { class: 'gjscr-modal gjscr-settings' },

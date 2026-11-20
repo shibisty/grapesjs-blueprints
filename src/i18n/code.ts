@@ -61,6 +61,23 @@ export interface CodeLabels {
   noRecordCode: string;
   newJsHere: string;
   newCssHere: string;
+  sectionUnique: string;
+  kindUnique: string;
+  kindUniqueHint: string;
+  sectionLegacy: string;
+  conditions: string;
+  condPage: string;
+  condComponent: string;
+  condComponents: string;
+  condIs: string;
+  condIsNot: string;
+  condGone: string;
+  addCondition: string;
+  conditionsHint: string;
+  noConditions: string;
+  editConditions: string;
+  libGlobalHint: string;
+  libUniqueHint: string;
 }
 
 export const codeEn: CodeLabels = {
@@ -117,6 +134,23 @@ export const codeEn: CodeLabels = {
   noRecordCode: 'No page scripts or styles yet.',
   newJsHere: 'New JavaScript here',
   newCssHere: 'New styles here',
+  sectionUnique: "Unique",
+  kindUnique: "Unique",
+  kindUniqueHint: "Only where its conditions hold: on chosen pages (with their layouts and templates) or with chosen components.",
+  sectionLegacy: "Components (old)",
+  conditions: "Conditions",
+  condPage: "page",
+  condComponent: "component",
+  condComponents: "Components",
+  condIs: "is",
+  condIsNot: "is not",
+  condGone: "gone",
+  addCondition: "Add a condition",
+  conditionsHint: "\"is\" — any of them; \"is not\" — none of them.",
+  noConditions: "No conditions yet: it works everywhere, like a global one.",
+  editConditions: "Conditions",
+  libGlobalHint: "Loaded on every page.",
+  libUniqueHint: "Loaded only where the conditions hold.",
 };
 
 export const codeRu: CodeLabels = {
@@ -173,6 +207,23 @@ export const codeRu: CodeLabels = {
   noRecordCode: 'Страничных скриптов и стилей пока нет.',
   newJsHere: 'Новый JavaScript здесь',
   newCssHere: 'Новые стили здесь',
+  sectionUnique: "Уникальные",
+  kindUnique: "Уникальный",
+  kindUniqueHint: "Только там, где выполняются условия: на выбранных страницах (вместе с их лэйаутами и шаблонами) или с выбранными компонентами.",
+  sectionLegacy: "Компоненты (старые)",
+  conditions: "Условия",
+  condPage: "страница",
+  condComponent: "компонент",
+  condComponents: "Компоненты",
+  condIs: "равно",
+  condIsNot: "не равно",
+  condGone: "удалена",
+  addCondition: "Добавить условие",
+  conditionsHint: "«равно» — любое из них; «не равно» — ни одно из них.",
+  noConditions: "Условий пока нет: работает везде, как глобальный.",
+  editConditions: "Условия",
+  libGlobalHint: "Подключается на всех страницах.",
+  libUniqueHint: "Подключается только там, где выполняются условия.",
 };
 
 export const codeUk: CodeLabels = {
@@ -229,4 +280,21 @@ export const codeUk: CodeLabels = {
   noRecordCode: 'Сторінкових скриптів і стилів поки немає.',
   newJsHere: 'Новий JavaScript тут',
   newCssHere: 'Нові стилі тут',
+  sectionUnique: "Унікальні",
+  kindUnique: "Унікальний",
+  kindUniqueHint: "Лише там, де виконуються умови: на вибраних сторінках (разом з їхніми лейаутами й шаблонами) або з вибраними компонентами.",
+  sectionLegacy: "Компоненти (старі)",
+  conditions: "Умови",
+  condPage: "сторінка",
+  condComponent: "компонент",
+  condComponents: "Компоненти",
+  condIs: "дорівнює",
+  condIsNot: "не дорівнює",
+  condGone: "видалено",
+  addCondition: "Додати умову",
+  conditionsHint: "«дорівнює» — будь-яка з них; «не дорівнює» — жодна з них.",
+  noConditions: "Умов поки немає: працює скрізь, як глобальний.",
+  editConditions: "Умови",
+  libGlobalHint: "Підключається на всіх сторінках.",
+  libUniqueHint: "Підключається лише там, де виконуються умови.",
 };

@@ -7,7 +7,6 @@ import { locales as graphLocales } from 'blueprintsjs/locales';
 import { componentOf, pickElement, selectorCandidates, suggestHookClass } from '../integration/picker';
 import type { Translator } from '../i18n';
 import { h } from './dom';
-import { projectPages } from './modals';
 
 /**
  * Pick an element in the canvas (the blueprint editor hides meanwhile), then choose one of its
@@ -106,7 +105,8 @@ export function openGraphEditor(editor: Editor, manager: ScriptsManager, registr
     registry,
     t: graphText(editor, o.labels),
     dir: isRtlLocale(getLocale(editor)) ? 'rtl' : 'ltr',
-    pages: () => projectPages(editor),
+    // Conditions (page / component is / is not) are edited from the Scripts sidebar, not here.
+    pages: () => [],
     pickSelector:
       o.t && editor.Canvas.getDocument?.()
         ? async () => {

@@ -6,6 +6,7 @@ import type { TargetChoice } from '../integration/pages';
 import { pagesComponentOf } from '../integration/components';
 import type { Translator } from '../i18n';
 import { contentSelect } from './content';
+import { rulesEditor } from './rules';
 import { h, icon } from './dom';
 import { isValidSelector } from './modals';
 
@@ -15,6 +16,8 @@ export interface CodeEditorOptions {
   t: Translator;
   /** Where a template item can apply (pages; with grapesjs-site-pages also layouts, templates). */
   choices: () => TargetChoice[];
+  /** grapesjs-site-pages is there: "Unique" is offered. */
+  withPages?: () => boolean;
   /** Picks a selector on the canvas (the eyedropper next to the condition). */
   pickSelector?: () => Promise<string | null>;
   /** Mount into this element (a workspace tab); without it the editor covers the page. */
@@ -242,8 +245,11 @@ export class CodeEditorView {
   private renderSide(): void {
     const t = this.o.t;
     const c = this.item;
-    const kinds: BlueprintKind[] = ['global', 'template', 'component'];
-    const kindName: Record<BlueprintKind, string> = { global: t('kindGlobal'), template: t('kindTemplate'), component: t('kindComponent') };
+    // Global always; Unique with grapesjs-site-pages; the old component kind only for an item of it.
+    const kinds = (['global', 'template', 'component'] as BlueprintKind[]).filter(
+      (k) => k === 'global' || k === c.kind || (k === 'template' && !!this.o.withPages?.()),
+    );
+    const kindName: Record<BlueprintKind, string> = { global: t('kindGlobal'), template: t('kindUnique'), component: t('kindComponent') };
     const kind = h(
       'select',
       {
@@ -284,56 +290,12 @@ export class CodeEditorView {
   private targetFields(): HTMLElement[] {
     const t = this.o.t;
     const target = this.item.target || { pages: [] };
-    const chosen = new Set(target.pages || []);
-    const choices = this.o.choices();
-    const set = (pages: string[]) => this.patch({ target: { ...this.item.target, pages } }, true);
-    const all = h('input', {
-      type: 'checkbox',
-      checked: !chosen.size,
-      onchange: () => {
-        if (all.checked) set([]);
-        this.renderSide();
-      },
+    const rules = rulesEditor({
+      t,
+      choices: this.o.choices,
+      value: target.pages || [],
+      onChange: (pages) => this.patch({ target: { ...this.item.target, pages } }, true),
     });
-    const groups: [TargetChoice['group'], string][] = [
-      ['page', t('targetPages')],
-      ['layout', t('targetLayouts')],
-      ['template', t('targetTemplates')],
-    ];
-    const lists = groups
-      .map(([g, label]) => {
-        const items = choices.filter((c) => c.group === g);
-        if (!items.length) return null as HTMLElement | null;
-        return h(
-          'div',
-          { class: 'gjscr-tgroup', 'data-group': g },
-          h('div', { class: 'gjscr-tgroup-title' }, label),
-          items.map((c) =>
-            h(
-              'label',
-              { class: 'gjscr-check' },
-              h('input', {
-                type: 'checkbox',
-                value: c.id,
-                checked: chosen.has(c.id),
-                onchange: (e: Event) => {
-                  const box = e.target as HTMLInputElement;
-                  const next = new Set(this.item.target?.pages || []);
-                  if (box.checked) next.add(c.id);
-                  else next.delete(c.id);
-                  set(Array.from(next));
-                  all.checked = !next.size;
-                },
-              }),
-              c.name,
-            ),
-          ),
-        ) as HTMLElement;
-      })
-      .filter((x): x is HTMLElement => !!x);
-    // Ids that are no longer there (a deleted page) stay visible, so they can be unticked.
-    const known = new Set(choices.map((c) => c.id));
-    const gone = Array.from(chosen).filter((id) => !known.has(id));
     const when = h('input', {
       class: 'gjscr-input',
       type: 'text',
@@ -366,14 +328,7 @@ export class CodeEditorView {
         )
       : null;
     return [
-      this.field(
-        t('targets'),
-        h('label', { class: 'gjscr-check' }, all, t('allPages')),
-        ...lists,
-        ...gone.map((id) =>
-          h('label', { class: 'gjscr-check is-gone' }, h('input', { type: 'checkbox', checked: true, onchange: () => set((this.item.target?.pages || []).filter((x) => x !== id)) }), id),
-        ),
-      ),
+      this.field(t('conditions'), rules),
       this.field(t('condition'), h('div', { class: 'gjscr-row' }, when, pick), h('small', { class: 'gjscr-hint' }, t('conditionHint'))),
     ];
   }

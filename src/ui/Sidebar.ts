@@ -7,6 +7,7 @@ import { getLocale, isRtlLocale, type Translator } from '../i18n';
 import { pagesComponentOf } from '../integration/components';
 import { h, icon, type ICONS } from './dom';
 import { projectPages } from './modals';
+import { rulesText } from './rules';
 
 export type SidebarTab = 'blueprints' | 'js' | 'css' | 'libraries';
 export const SIDEBAR_TABS: SidebarTab[] = ['blueprints', 'js', 'css', 'libraries'];
@@ -26,11 +27,17 @@ export interface SidebarActions {
   cssRules?(code: string): number;
   /** Are there linked components (grapesjs-site-pages) a component can hold? */
   canLink?(): boolean;
+  /** Is grapesjs-site-pages there (the "Unique" sections exist only with it)? */
+  withPages?(): boolean;
+  /** Opens the conditions of a unique blueprint. */
+  editConditions?(id: string): void;
+  /** Conditions of a library (where it is loaded). */
+  editLibraryConditions?(id: string): void;
   /** Chooses the content of a component blueprint (its HTML or a linked component). */
   componentContent?(id: string): void;
   settings(): void;
   preview(): void;
-  addLibrary(): void;
+  addLibrary(unique?: boolean): void;
   editLibrary(id: string): void;
   removeLibrary(id: string): void;
   toggleLibrary(id: string): void;
@@ -43,7 +50,15 @@ export interface SidebarActions {
   close(): void;
 }
 
-const KINDS: BlueprintKind[] = ['global', 'template', 'component'];
+/**
+ * Sections: "Global" always; "Unique" (kind `template`, with conditions) with
+ * grapesjs-site-pages or when such items exist; the old component kind only
+ * when items of it exist (no new ones are offered).
+ */
+function shownKinds(withPages: boolean, present: { kind: BlueprintKind }[]): BlueprintKind[] {
+  const has = (k: BlueprintKind) => present.some((x) => x.kind === k);
+  return (['global', 'template', 'component'] as BlueprintKind[]).filter((k) => k === 'global' || (k === 'template' ? withPages || has(k) : has(k)));
+}
 
 /** The "Scripts" panel: search and the scripts grouped by kind. Pure view of the manager. */
 export class Sidebar {
@@ -216,12 +231,15 @@ export class Sidebar {
     const all = this.manager.list();
     const shown = q ? all.filter((b) => this.matches(b, q)) : all;
     const frag = document.createDocumentFragment();
-    const sectionTitle: Record<BlueprintKind, string> = { global: t('sectionGlobal'), template: t('sectionTemplate'), component: t('sectionComponent') };
-    const kindName: Record<BlueprintKind, string> = { global: t('kindGlobal'), template: t('kindTemplate'), component: t('kindComponent') };
-    for (const kind of KINDS) {
+    const sectionTitle: Record<BlueprintKind, string> = { global: t('sectionGlobal'), template: t('sectionUnique'), component: t('sectionLegacy') };
+    const kindName: Record<BlueprintKind, string> = { global: t('kindGlobal'), template: t('kindUnique'), component: t('kindComponent') };
+    for (const kind of shownKinds(!!this.actions.withPages?.(), all)) {
       const items = shown.filter((b) => b.kind === kind);
       if (q && !items.length) continue;
-      const add = h('button', { class: 'gjscr-act', type: 'button', title: `${t('newScript')}: ${kindName[kind]}`, onclick: () => this.actions.create(kind) }, icon('plus', 14));
+      const add =
+        kind === 'component' || (kind === 'template' && !this.actions.withPages?.())
+          ? null
+          : h('button', { class: 'gjscr-act', type: 'button', title: `${t('newScript')}: ${kindName[kind]}`, onclick: () => this.actions.create(kind) }, icon('plus', 14));
       frag.append(
         h('div', { class: 'gjscr-section', 'data-kind': kind }, h('span', {}, sectionTitle[kind], h('span', { class: 'gjscr-count' }, String(items.length))), add),
         items.length
@@ -244,34 +262,46 @@ export class Sidebar {
     const t = this.t;
     const frag = document.createDocumentFragment();
     const libs = this.manager.libraries().filter((l) => !q || `${l.name} ${l.version || ''}`.toLowerCase().includes(q));
-    {
+    // Global (no conditions) and, with grapesjs-site-pages, unique libraries.
+    const unique = !!this.actions.withPages?.() || libs.some((l) => !!l.pages?.length);
+    const sections: [string, typeof libs, boolean][] = unique
+      ? [
+          [t('sectionGlobal'), libs.filter((l) => !l.pages?.length), false],
+          [t('sectionUnique'), libs.filter((l) => !!l.pages?.length), true],
+        ]
+      : [[t('sectionLibraries'), libs, false]];
+    for (const [title, list, isUnique] of sections) {
+      if (q && !list.length) continue;
       frag.append(
         h(
           'div',
-          { class: 'gjscr-section', 'data-kind': 'libraries' },
-          h('span', {}, t('sectionLibraries'), h('span', { class: 'gjscr-count' }, String(libs.length))),
-          h('button', { class: 'gjscr-act', type: 'button', title: t('addLibrary'), onclick: () => this.actions.addLibrary() }, icon('plus', 14)),
+          { class: 'gjscr-section', 'data-kind': isUnique ? 'libraries-unique' : 'libraries' },
+          h('span', {}, title, h('span', { class: 'gjscr-count' }, String(list.length))),
+          h('button', { class: 'gjscr-act', type: 'button', title: t('addLibrary'), onclick: () => this.actions.addLibrary(isUnique) }, icon('plus', 14)),
         ),
-        libs.length
+        list.length
           ? h(
               'ul',
               { class: 'gjscr-list', role: 'list' },
-              libs.map((l) =>
+              list.map((l) =>
                 h(
                   'li',
                   { class: `gjscr-item gjscr-libitem${l.enabled ? '' : ' is-off'}`, tabindex: 0, 'data-lib': l.id, title: l.files.map((f) => f.url).join('\n'), onclick: () => this.actions.editLibrary(l.id) },
                   h('span', { class: 'gjscr-dot' }),
-                  h('div', { class: 'gjscr-main' }, h('div', { class: 'gjscr-name' }, l.name), h('div', { class: 'gjscr-sub' }, [l.version, l.files.map((f) => f.type).join(' + '), l.pages?.length ? t('pagesCount', l.pages.length) : ''].filter(Boolean).join(' · '))),
+                  h('div', { class: 'gjscr-main' }, h('div', { class: 'gjscr-name' }, l.name), h('div', { class: 'gjscr-sub' }, [l.version, l.files.map((f) => f.type).join(' + '), l.pages?.length ? rulesText(t, l.pages, this.names()) : ''].filter(Boolean).join(' · '))),
                   h(
                     'div',
                     { class: 'gjscr-acts' },
+                    unique && this.actions.editLibraryConditions
+                      ? h('button', { class: 'gjscr-act', type: 'button', 'data-role': 'conditions', title: t('editConditions'), onclick: (e: Event) => (e.stopPropagation(), this.actions.editLibraryConditions!(l.id)) }, icon('filter', 14))
+                      : null,
                     h('button', { class: 'gjscr-act', type: 'button', title: l.enabled ? t('disable') : t('enable'), onclick: (e: Event) => (e.stopPropagation(), this.actions.toggleLibrary(l.id)) }, icon('power', 14)),
                     h('button', { class: 'gjscr-act', type: 'button', title: t('remove'), onclick: (e: Event) => (e.stopPropagation(), this.actions.removeLibrary(l.id)) }, icon('trash', 14)),
                   ),
                 ),
               ),
             )
-          : h('div', { class: 'gjscr-empty' }, t('noLibraries')),
+          : h('div', { class: 'gjscr-empty' }, isUnique ? '—' : t('noLibraries')),
       );
     }
     if (alone && q && !libs.length) frag.append(h('div', { class: 'gjscr-empty' }, t('noMatch')));
@@ -283,13 +313,16 @@ export class Sidebar {
     const all = this.manager.listCode(lang);
     const shown = q ? all.filter((c) => [c.name, c.description, c.code, c.component?.type, c.target?.when, c.target?.componentType].join(' ').toLowerCase().includes(q)) : all;
     const frag = document.createDocumentFragment();
-    const sectionTitle: Record<BlueprintKind, string> = { global: t('sectionGlobal'), template: t('sectionTemplate'), component: t('sectionComponent') };
-    const kindName: Record<BlueprintKind, string> = { global: t('kindGlobal'), template: t('kindTemplate'), component: t('kindComponent') };
+    const sectionTitle: Record<BlueprintKind, string> = { global: t('sectionGlobal'), template: t('sectionUnique'), component: t('sectionLegacy') };
+    const kindName: Record<BlueprintKind, string> = { global: t('kindGlobal'), template: t('kindUnique'), component: t('kindComponent') };
     const newLabel = lang === 'js' ? t('newJs') : t('newCss');
-    for (const kind of KINDS) {
+    for (const kind of shownKinds(!!this.actions.withPages?.(), all)) {
       const items = shown.filter((c) => c.kind === kind);
       if (q && !items.length) continue;
-      const add = h('button', { class: 'gjscr-act', type: 'button', title: `${newLabel}: ${kindName[kind]}`, onclick: () => this.actions.createCode(lang, kind) }, icon('plus', 14));
+      const add =
+        kind === 'component' || (kind === 'template' && !this.actions.withPages?.())
+          ? null
+          : h('button', { class: 'gjscr-act', type: 'button', title: `${newLabel}: ${kindName[kind]}`, onclick: () => this.actions.createCode(lang, kind) }, icon('plus', 14));
       frag.append(
         h('div', { class: 'gjscr-section', 'data-kind': kind }, h('span', {}, sectionTitle[kind], h('span', { class: 'gjscr-count' }, String(items.length))), add),
         items.length
@@ -305,11 +338,10 @@ export class Sidebar {
     const t = this.t;
     const parts: string[] = [];
     if (c.kind === 'template') {
-      const pages = c.target?.pages || [];
-      const names = this.actions.targetNames?.() || new Map(projectPages(this.editor).map((p) => [p.id, p.name]));
-      if (pages.length) parts.push(pages.map((id) => names.get(id) || id).join(', '));
+      const text = rulesText(t, c.target?.pages, this.names());
+      if (text) parts.push(text);
       if (c.target?.when) parts.push(c.target.when);
-      if (!pages.length && !c.target?.when) parts.push(t('allPages'));
+      if (!text && !c.target?.when) parts.push(t('allPages'));
     }
     if (c.kind === 'component') {
       const type = c.lang === 'js' ? c.component?.type : c.target?.componentType;
@@ -362,13 +394,10 @@ export class Sidebar {
     const t = this.t;
     const parts: (string | HTMLElement)[] = [];
     if (b.kind === 'template') {
-      const pages = b.target?.pages || [];
-      if (pages.length) {
-        const names = new Map(projectPages(this.editor).map((p) => [p.id, p.name]));
-        parts.push(pages.map((id) => names.get(id) || id).join(', '));
-      }
+      const text = rulesText(t, b.target?.pages, this.names());
+      if (text) parts.push(text);
       if (b.target?.when) parts.push(b.target.when);
-      if (!pages.length && !b.target?.when) parts.push(t('allPages'));
+      if (!text && !b.target?.when) parts.push(t('allPages'));
     }
     if (b.kind === 'component' && b.component?.type) parts.push(`<${b.component.type}>`);
     parts.push(t('nodes', b.nodes.length));
@@ -378,6 +407,11 @@ export class Sidebar {
     const out: (string | HTMLElement)[] = [parts.join(' · ')];
     if (errors) out.push(' · ', h('span', { class: 'gjscr-err' }, t('errors', errors)));
     return out;
+  }
+
+  /** Record names by id (pages, layouts, templates, components). */
+  private names(): Map<string, string> {
+    return this.actions.targetNames?.() || new Map(projectPages(this.editor).map((p) => [p.id, p.name]));
   }
 
   private item(b: Blueprint): HTMLLIElement {
@@ -414,6 +448,7 @@ export class Sidebar {
         'div',
         { class: 'gjscr-acts' },
         act('code', t('viewCode'), () => this.actions.code(b.id)),
+        b.kind === 'template' && this.actions.editConditions ? act('filter', t('editConditions'), () => this.actions.editConditions!(b.id)) : null,
         b.kind === 'component' && this.actions.componentContent && (this.actions.canLink?.() || pagesComponentOf(b.component))
           ? act('link', t('componentContentAction'), () => this.actions.componentContent!(b.id))
           : null,

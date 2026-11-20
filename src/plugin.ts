@@ -17,7 +17,8 @@ import type { Library } from './core/libraries';
 import { openGraphEditor, graphText, pickSelectorFlow } from './ui/graph';
 import { currentWorkspace, docId as blueprintDocId, DOC_PREFIX as BLUEPRINT_DOC_PREFIX, onWorkspace, revealCanvas, type WorkspaceLike } from './integration/workspace';
 import { pagesComponents, pagesOf, ScopeTracker, shareWithPages } from './integration/pages';
-import { openRecordCodeDialog, type RecordRef } from './ui/recordCode';
+import { rulesEditor } from './ui/rules';
+import { openRecordCodeDialog, recordRule, type RecordRef } from './ui/recordCode';
 import { contentSelect } from './ui/content';
 import { CssItems } from './integration/cssItems';
 import { openLibraryDialog } from './ui/libraries';
@@ -189,7 +190,7 @@ function scriptsPlugin(editor: Editor, userOpts: ScriptsPluginOptions = {}): voi
   /* ----------------------------------------------------------- actions */
 
   const openCreate = async (kind?: BlueprintKind): Promise<Blueprint | null> => {
-    const init = await openCreateDialog(editor, manager, t, { kind });
+    const init = await openCreateDialog(editor, manager, t, { kind, withPages: tracker.withPages, choices: () => tracker.choices() });
     if (!init) return null;
     const bp = manager.create(init);
     editor.runCommand(COMMANDS.edit, { id: bp.id });
@@ -242,6 +243,7 @@ function scriptsPlugin(editor: Editor, userOpts: ScriptsPluginOptions = {}): voi
       t,
       parent,
       choices: () => tracker.choices(),
+      withPages: () => tracker.withPages,
       cssRules: (code) => cssItems.ruleCount(code),
       pagesComponents: () => pagesComponents(editor),
       pickSelector: async () => {
@@ -354,7 +356,7 @@ function scriptsPlugin(editor: Editor, userOpts: ScriptsPluginOptions = {}): voi
     if (opts.injectCss) injectCss();
     openRecordCodeDialog(editor, manager, t, rec, {
       createHere: (lang) => {
-        const item = manager.createCode({ lang, kind: 'template', target: { pages: [rec.id] } });
+        const item = manager.createCode({ lang, kind: 'template', target: { pages: [recordRule(rec)] } });
         editCode(item.id);
       },
       edit: (id) => editCode(id),
@@ -362,7 +364,7 @@ function scriptsPlugin(editor: Editor, userOpts: ScriptsPluginOptions = {}): voi
   };
   on('pages-manager:record-actions', ({ record, actions }: { record: RecordRef & { deleted?: boolean }; actions: any[] }) => {
     const kind = record?.kind || 'page';
-    if (!record || record.deleted || !['page', 'layout', 'template'].includes(kind) || !Array.isArray(actions)) return;
+    if (!record || record.deleted || !['page', 'layout', 'template', 'component'].includes(kind) || !Array.isArray(actions)) return;
     actions.push({ id: 'scripts', label: t('scriptsAndStyles'), icon: '{}', run: (r: RecordRef) => recordCode(r) });
   });
   // The component content action shows only while pages has components.
@@ -386,10 +388,61 @@ function scriptsPlugin(editor: Editor, userOpts: ScriptsPluginOptions = {}): voi
   };
 
   const addLibraryDialog = () => openLibraryDialog(editor, manager, t, http);
+  const libraryScope = () => ({ withPages: tracker.withPages, choices: () => tracker.choices() });
   const openSettings = () =>
-    openSettingsDialog(editor, manager, t, exporter!, () => {
-      void addLibraryDialog().then(() => openSettings());
+    openSettingsDialog(
+      editor,
+      manager,
+      t,
+      exporter!,
+      () => {
+        void addLibraryDialog().then(() => openSettings());
+      },
+      libraryScope(),
+    );
+
+  /** Conditions of a unique item (page / component is / is not) in a small dialog. */
+  const openConditions = (title: string, value: string[], save: (pages: string[]) => void): void => {
+    if (opts.injectCss) injectCss();
+    let next = value.slice();
+    const body = h(
+      'div',
+      { class: 'gjscr-modal gjscr-conditions' },
+      rulesEditor({ t, choices: () => tracker.choices(), value, onChange: (v) => (next = v) }),
+      h(
+        'div',
+        { class: 'gjscr-actions' },
+        h('button', { type: 'button', class: 'gjscr-secondary', onclick: () => (editor.Modal as any).close() }, t('cancel')),
+        h(
+          'button',
+          {
+            type: 'button',
+            class: 'gjscr-primary',
+            'data-role': 'apply',
+            onclick: () => {
+              save(next);
+              (editor.Modal as any).close();
+            },
+          },
+          t('done'),
+        ),
+      ),
+    );
+    openModal(editor, `${t('conditions')}: ${title}`, body);
+  };
+  const editConditions = (id: string): void => {
+    const bp = manager.get(id);
+    if (!bp) return;
+    openConditions(bp.name, bp.target?.pages || [], (pages) => {
+      const cur = manager.get(id);
+      if (cur) manager.update(id, { target: { ...(cur.target || {}), pages } });
     });
+  };
+  /** A new library; a unique one asks for its conditions right after. */
+  const addLibrary = async (unique?: boolean): Promise<void> => {
+    const lib = await addLibraryDialog();
+    if (lib && unique) openConditions(lib.name, [], (pages) => manager.updateLibrary(lib.id, { pages }));
+  };
 
   const api: ScriptsApi = {
     list: (k) => manager.list(k),
@@ -677,7 +730,14 @@ function scriptsPlugin(editor: Editor, userOpts: ScriptsPluginOptions = {}): voi
 
   // Canvas: library CSS while editing; the scripts only in the preview.
   on('canvas:frame:load', () => runner?.syncLibraries());
-  on('page:select', () => runner?.syncLibraries());
+  on('page:select pages-manager:open', () => runner?.syncLibraries());
+  // Libraries limited by "component is / is not" follow linked components added to / removed from the page.
+  let libSync: ReturnType<typeof setTimeout> | undefined;
+  on('component:add component:remove', () => {
+    if (!manager.libraries().some((l) => (l.pages || []).some((r) => r.replace(/^!/, '').startsWith('component:')))) return;
+    clearTimeout(libSync);
+    libSync = setTimeout(() => runner?.syncLibraries(), 50);
+  });
   if (opts.preview) {
     on('run:core:preview', () => void runner?.start().catch((e) => console.error('[grapesjs-scripts]', e)));
     on('stop:core:preview', () => {
@@ -703,8 +763,14 @@ function scriptsPlugin(editor: Editor, userOpts: ScriptsPluginOptions = {}): voi
     sidebar = new Sidebar(editor, manager, t, {
       create: (kind) => void openCreate(kind),
       settings: () => void openSettings(),
-      addLibrary: () => void addLibraryDialog(),
+      addLibrary: (unique) => void addLibrary(unique),
       editLibrary: () => void openSettings(),
+      withPages: () => tracker.withPages,
+      editConditions,
+      editLibraryConditions: (id) => {
+        const lib = manager.library(id);
+        if (lib) openConditions(lib.name, lib.pages || [], (pages) => manager.updateLibrary(id, { pages }));
+      },
       removeLibrary: (id) => {
         const lib = manager.library(id);
         if (lib && window.confirm(t('confirmRemove', lib.name))) manager.removeLibrary(id);

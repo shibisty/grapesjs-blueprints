@@ -123,12 +123,13 @@ describe('pages records: "Scripts & styles"', () => {
     return actions;
   };
 
-  it('adds the action to pages, layouts and templates only', async () => {
+  it('adds the action to pages, layouts, templates and components', async () => {
     const { editor } = await start();
     expect(ask(editor, { id: 'p1', name: 'Home', kind: 'page' }).map((a) => a.id)).toEqual(['scripts']);
     expect(ask(editor, { id: 'l1', name: 'Main', kind: 'layout' }).length).toBe(1);
     expect(ask(editor, { id: 't1', name: 'Post', kind: 'template' }).length).toBe(1);
-    expect(ask(editor, { id: 'c1', name: 'Footer', kind: 'component' }).length).toBe(0);
+    expect(ask(editor, { id: 'c1', name: 'Footer', kind: 'component' }).length).toBe(1);
+    expect(ask(editor, { id: 'e1', name: 'Entry', kind: 'entry' }).length).toBe(0);
     expect(ask(editor, { id: 'p2', name: 'Old', kind: 'page', deleted: true }).length).toBe(0);
   });
 

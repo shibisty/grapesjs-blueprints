@@ -96,7 +96,7 @@ export interface TargetChoice {
   id: string;
   name: string;
   /** `page` also for `editor.Pages` pages (without grapesjs-site-pages). */
-  group: 'page' | 'layout' | 'template';
+  group: 'page' | 'layout' | 'template' | 'component';
 }
 
 export class ScopeTracker {
@@ -132,7 +132,7 @@ export class ScopeTracker {
     this.loading = true;
     try {
       const list = await pm.list();
-      const groups = new Set(['page', 'layout', 'template']);
+      const groups = new Set(['page', 'layout', 'template', 'component']);
       const next = list
         .filter((r) => !r.deleted && !r.templateId && groups.has(r.kind || 'page'))
         .map((r) => ({ id: r.id, name: r.name, group: (r.kind || 'page') as TargetChoice['group'] }));
@@ -179,11 +179,29 @@ export class ScopeTracker {
   /** The page as a scope; `pageId` (an `editor.Pages` id) when given wins. */
   scope(pageId?: string): PageScope | undefined {
     if (pageId) return { id: pageId };
-    if (this.rec) return { id: this.rec.id, layoutId: this.rec.layoutId, templateId: this.rec.templateId };
+    if (this.rec) {
+      const s: PageScope = { id: this.rec.id, layoutId: this.rec.layoutId, templateId: this.rec.templateId, components: this.usedComponents() };
+      if (this.rec.kind === 'component') s.kind = 'component';
+      return s;
+    }
     if (this.withPages) return undefined;
     const p = (this.editor as any).Pages?.getSelected?.();
     const id = p?.getId?.() ?? p?.id;
     return id ? { id: String(id) } : undefined;
+  }
+
+  /** Linked components (grapesjs-site-pages) inserted in the open record. */
+  usedComponents(): string[] {
+    const ids = new Set<string>();
+    try {
+      (this.editor.getWrapper()?.find(`[${PAGES_COMPONENT_ATTR}]`) || []).forEach((c: any) => {
+        const id = c.getAttributes?.()[PAGES_COMPONENT_ATTR];
+        if (id) ids.add(String(id));
+      });
+    } catch {
+      /* no wrapper yet */
+    }
+    return [...ids];
   }
 
   destroy(): void {

@@ -77,6 +77,13 @@ export const CSS = `
 .gjscr-h{margin:16px 0 8px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;opacity:.7}
 .gjscr-h:first-child{margin-top:0}
 .gjscr-inline{display:flex;gap:6px;align-items:center;margin:4px 0}
+.gjscr-rules{display:flex;flex-direction:column;gap:4px}
+.gjscr-rule{display:flex;gap:4px;align-items:center}
+.gjscr-rule select{width:auto;min-width:0;flex:0 0 auto}
+.gjscr-rule select[data-role="id"]{flex:1 1 auto}
+.gjscr-rule[data-op="ne"] .gjscr-rule-op{color:#e8a87c}
+.gjscr-rules>.gjscr-btn{align-self:flex-start}
+.gjscr-conditions{min-width:min(460px,80vw)}
 .gjscr-spacer{flex:1}
 .gjscr-check-top{align-items:flex-start;margin:6px 0}
 .gjscr-check-top input{margin-top:3px}

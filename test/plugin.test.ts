@@ -131,56 +131,38 @@ describe('plugin', () => {
     expect(api.build({ pageId: 'product' }).blueprints).toHaveLength(2);
   });
 
-  it('create dialog: component with a type, then the script opens', async () => {
+  it('create dialog without site pages: only Global, then the script opens', async () => {
     s = await createEditor();
     const { editor, api } = s;
     editor.runCommand(COMMANDS.open);
     const edits = vi.fn();
     editor.on(EVENTS.edit, edits);
-    click(document.querySelector('.gjscr-section[data-kind="component"] .gjscr-act'));
+    expect(document.querySelector('.gjscr-section[data-kind="component"]')).toBeNull();
+    expect(document.querySelector('.gjscr-section[data-kind="template"]')).toBeNull();
+    click(document.querySelector('.gjscr-section[data-kind="global"] .gjscr-act'));
     await tick();
     expect(modalOpen()).toBe(true);
     const form = modal()!.querySelector('form')!;
-    const name = form.querySelector<HTMLInputElement>('#gjscr-name')!;
-    expect(form.querySelector<HTMLInputElement>('input[value="component"]')!.checked).toBe(true);
-    name.value = 'Hero Slider';
-    name.dispatchEvent(new Event('input'));
-    expect(form.querySelector<HTMLInputElement>('#gjscr-ctype')!.value).toBe('bp-hero-slider');
+    expect(form.querySelector('input[value="template"]')).toBeNull();
+    expect(form.querySelector('input[value="component"]')).toBeNull();
+    form.querySelector<HTMLInputElement>('#gjscr-name')!.value = 'Hero Slider';
     form.dispatchEvent(new Event('submit', { cancelable: true }));
     await tick();
     const [bp] = api.list();
-    expect(bp).toMatchObject({ name: 'Hero Slider', kind: 'component', component: { type: 'bp-hero-slider', label: 'Hero Slider' } });
+    expect(bp).toMatchObject({ name: 'Hero Slider', kind: 'global' });
     expect(edits).toHaveBeenCalledWith({ id: bp.id });
-    // the blueprint editor opens on the new script
     expect(document.querySelector<HTMLInputElement>('.bpe .bpe-name')!.value).toBe('Hero Slider');
-    expect(api.getGraphEditor()!.state.bp.id).toBe(bp.id);
   });
 
-  it('create dialog: validates the template condition and the component type', async () => {
+  it('legacy component scripts keep their section (without a + button)', async () => {
     s = await createEditor();
     const { editor, api } = s;
     api.create({ kind: 'component', name: 'Tabs' });
-    void editor.runCommand(COMMANDS.create, { kind: 'template' });
+    editor.runCommand(COMMANDS.open);
     await tick();
-    const form = () => modal()!.querySelector('form')!;
-    const when = form().querySelector<HTMLInputElement>('#gjscr-when')!;
-    when.value = 'div[';
-    form().dispatchEvent(new Event('submit', { cancelable: true }));
-    expect(form().querySelector('.gjscr-msg')!.textContent).toBe('Invalid CSS selector');
-    expect(api.list()).toHaveLength(1);
-    // switch to component with a taken type
-    const comp = form().querySelector<HTMLInputElement>('input[value="component"]')!;
-    comp.checked = true;
-    comp.dispatchEvent(new Event('change'));
-    const type = form().querySelector<HTMLInputElement>('#gjscr-ctype')!;
-    type.value = 'bp-tabs';
-    type.dispatchEvent(new Event('input'));
-    form().dispatchEvent(new Event('submit', { cancelable: true }));
-    expect(form().querySelector('.gjscr-msg')!.textContent).toBe('This component type already exists');
-    // cancel resolves with nothing
-    click(form().querySelector('.gjscr-secondary'));
-    await tick();
-    expect(api.list()).toHaveLength(1);
+    const sec = document.querySelector('.gjscr-section[data-kind="component"]')!;
+    expect(sec).toBeTruthy();
+    expect(sec.querySelector('.gjscr-act')).toBeNull();
   });
 
   it('code view: highlighted JS with problems, copy', async () => {

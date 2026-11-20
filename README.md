@@ -4,7 +4,7 @@ Visual scripting for [GrapesJS](https://grapesjs.com). Page behaviour is built f
 
 ![Blueprint editor](docs/img/07-graph.png)
 
-- **Scripts view** next to Layers/Styles: global scripts, template scripts, component scripts, CDN libraries.
+- **Scripts view** next to Layers/Styles: blueprints, JS, CSS and CDN libraries — **Global**, and with grapesjs-site-pages also **Unique** (only where their conditions hold).
 - **Blueprint editor**: palette, drag & drop, typed wires, inline values, details panel, variables, comments, minimap, undo/redo, copy/paste, a JavaScript tab with the exact output.
 - **Element picker**: click an element in the canvas, choose a selector (or give the element a `js-` class).
 - **Preview**: scripts run in the GrapesJS preview only — while editing, a click still selects.
@@ -54,8 +54,17 @@ Without a bundler:
 | Kind | Runs | Typical use |
 |---|---|---|
 | **Global** | on every page | popups, menus, anything bound to a selector |
-| **Template** | on the chosen `editor.Pages` pages and/or where a CSS condition matches at runtime (`body.tpl-product`) | page-type behaviour |
-| **Component** | in every instance of a component type the script defines (a block in the Block Manager) | widgets: accordion, tabs, slider |
+| **Unique** (with grapesjs-site-pages) | only where its **conditions** hold, and/or where a CSS condition matches at runtime (`body.tpl-product`) | page-type behaviour, a script for one component |
+| **Component** (older projects) | in every instance of a component type the script defines (a block in the Block Manager) | widgets: accordion, tabs, slider |
+
+Without grapesjs-site-pages everything is Global. With it, the Unique section appears for blueprints, JS, CSS and libraries. A condition is one of:
+
+- **page is / is not** a page, layout or template of pages (a layout or a template counts for every page in it);
+- **component is / is not** a linked component of pages: true on a page that has the component on it, and in the component itself.
+
+"Is" conditions are joined with **OR** (any one is enough), "is not" ones with **AND** (each must hold). A Unique item with no conditions runs everywhere. Edit them in the new-script dialog, the code editor, the filter button of a list item, or from pages (*Scripts & styles* of a record).
+
+Conditions are stored as strings in `target.pages` (blueprints, JS, CSS) and `pages` (libraries): `<id>`, `!<id>`, `component:<id>`, `!component:<id>`. A plain id is what older versions stored (page is), so existing projects keep working. New component scripts are no longer offered; existing ones keep their section.
 
 ### Blueprints
 
@@ -108,7 +117,7 @@ const site = await editor.Scripts.exportSite();
 
 ### Libraries
 
-Add a library from the popular presets, by searching npm (files and SRI hashes through jsDelivr) or cdnjs, or by URL. Versions are always exact. CSS is loaded into the canvas while editing; JS only in the preview (or always, per library). Libraries can be limited to some pages.
+Add a library from the popular presets, by searching npm (files and SRI hashes through jsDelivr) or cdnjs, or by URL. Versions are always exact. CSS is loaded into the canvas while editing; JS only in the preview (or always, per library). With grapesjs-site-pages a library can be Unique: loaded only where its conditions hold (see *Kinds of scripts*) — not every library is needed on every page.
 
 The npm registry, jsDelivr and cdnjs APIs are called from the browser. If a host does not answer cross-origin requests in your setup, use the bundled PHP proxy (whitelisted hosts, disk cache, stale copy on failure):
 
@@ -148,7 +157,7 @@ A component script defines a GrapesJS component type (`bp-…`): its HTML, CSS a
 With pages 2.7+ the two plugins also link up:
 
 - **Components both ways.** A component (blueprint or component JS) can take a pages *linked component* as the content of a new instance instead of its own HTML: *Content of a new instance* in the code editor and the new-script dialog, or the link button on a component blueprint. In pages, the "+" of Components offers our component types as a starting point (source `blueprints`).
-- **Scripts & styles of a record.** Pages, layouts and templates get a `{}` button in the pages sidebar: it lists the page JS/CSS items with a checkbox each (checked — runs on this record; for a layout — on every page in it), the global ones, and creates new items for that record.
+- **Scripts & styles of a record.** Pages, layouts, templates and components get a `{}` button in the pages sidebar: it lists the Unique JS/CSS items and libraries with a checkbox each (checked — used on this record; for a layout — on every page in it; for a component — on every page that has it), the global ones, and creates new items for that record. A checkbox edits the item's conditions: checking adds "is <record>" (or removes "is not <record>"), unchecking the only condition switches the item off instead of making it global.
 
 ## API
 

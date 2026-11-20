@@ -75,7 +75,7 @@ describe('ScopeTracker: which page the editor shows', () => {
     const t = new ScopeTracker(s.editor);
     expect(t.scope()).toBeUndefined(); // nothing open yet: not editor.Pages
     s.editor.trigger('pages-manager:open', { id: 'p1', kind: 'page', layoutId: 'L', templateId: null, data: {} });
-    expect(t.scope()).toEqual({ id: 'p1', layoutId: 'L', templateId: null });
+    expect(t.scope()).toEqual({ id: 'p1', layoutId: 'L', templateId: null, components: [] });
     expect(t.record).toMatchObject({ id: 'p1', kind: 'page' });
     s.editor.trigger('pages-manager:detach');
     expect(t.scope()).toBeUndefined();

@@ -1,3 +1,5 @@
+import { rulesEditor } from './rules';
+import type { TargetChoice } from '../integration/pages';
 import type { Editor } from 'grapesjs';
 import { fileTypeOf, type Library } from '../core/libraries';
 import type { ScriptsManager } from '../core/ScriptsManager';
@@ -182,7 +184,13 @@ export function openLibraryDialog(editor: Editor, manager: ScriptsManager, t: Tr
 }
 
 /** Library rows for the settings dialog (enable, pages, loading, order, delete). */
-export function librariesEditor(editor: Editor, manager: ScriptsManager, t: Translator, pages: { id: string; name: string }[], onAdd: () => void): HTMLElement {
+/** Where libraries may be limited to: grapesjs-site-pages records (conditions). */
+export interface LibraryScope {
+  withPages: boolean;
+  choices: () => TargetChoice[];
+}
+
+export function librariesEditor(editor: Editor, manager: ScriptsManager, t: Translator, scope: LibraryScope, onAdd: () => void): HTMLElement {
   const box = h('div', { class: 'gjscr-libs' });
   const render = () => {
     const libs = manager.libraries();
@@ -195,29 +203,20 @@ export function librariesEditor(editor: Editor, manager: ScriptsManager, t: Tran
               { class: 'gjscr-input', style: 'width:auto', title: t('loadMode'), onchange: () => set({ load: load.value as Library['load'] }) },
               ['defer', 'async', 'module', 'blocking'].map((v) => h('option', { value: v, selected: (lib.load || 'defer') === v }, v)),
             );
+            // Global (no conditions) or unique: only where the conditions hold.
             const pagesBox =
-              pages.length > 1
+              scope.withPages || lib.pages?.length
                 ? h(
                     'details',
-                    {},
-                    h('summary', {}, lib.pages?.length ? t('pagesCount', lib.pages.length) : t('allPages')),
-                    pages.map((p) =>
-                      h(
-                        'label',
-                        { class: 'gjscr-check' },
-                        h('input', {
-                          type: 'checkbox',
-                          checked: !!lib.pages?.includes(p.id),
-                          onchange: (e: Event) => {
-                            const next = new Set(lib.pages || []);
-                            if ((e.target as HTMLInputElement).checked) next.add(p.id);
-                            else next.delete(p.id);
-                            set({ pages: Array.from(next) });
-                          },
-                        }),
-                        p.name,
-                      ),
-                    ),
+                    { open: lib.pages?.length ? true : null },
+                    h('summary', {}, lib.pages?.length ? `${t('sectionUnique')}: ${t('conditions').toLowerCase()}` : t('libGlobalHint')),
+                    rulesEditor({
+                      t,
+                      choices: scope.choices,
+                      value: lib.pages || [],
+                      // no re-render: the rules editor keeps its own rows
+                      onChange: (pages) => manager.updateLibrary(lib.id, { pages }),
+                    }),
                   )
                 : null;
             return h(

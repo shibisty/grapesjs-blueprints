@@ -90,7 +90,11 @@ export class CssItems {
     on('scripts:code scripts:change', soon);
     // Another page: its template items (and its components) apply.
     on('page pages-manager:open load', soon);
-    on('component:add component:remove', () => this.manager.listCode('css', 'component').length && this.applySoon());
+    // Component CSS, and unique CSS with "component is / is not" conditions, follow what is on the page.
+    const byComponent = () =>
+      this.manager.listCode('css', 'component').length > 0 ||
+      this.manager.listCode('css', 'template').some((c) => (c.target?.pages || []).some((r) => r.replace(/^!/, '').startsWith('component:')));
+    on('component:add component:remove', () => byComponent() && this.applySoon());
     const rules = (editor.Css as any).getAll();
     const onStyle = (rule: Rule) => this.ruleEdited(rule);
     rules.on('change:style', onStyle);

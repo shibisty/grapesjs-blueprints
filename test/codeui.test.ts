@@ -53,10 +53,11 @@ describe('sidebar tabs', () => {
     expect(localStorage.getItem('gjscr-tab')).toBe('js');
     tab('css').click();
     await tick();
-    // The + of a section creates that kind.
-    panel().querySelector<HTMLButtonElement>('.gjscr-section[data-kind="template"] .gjscr-act')!.click();
+    // Without grapesjs-site-pages there is only Global (no Unique section).
+    expect(panel().querySelector('.gjscr-section[data-kind="template"]')).toBeNull();
+    panel().querySelector<HTMLButtonElement>('.gjscr-section[data-kind="global"] .gjscr-act')!.click();
     await tick();
-    expect(api.code.list('css')[0]).toMatchObject({ kind: 'template', name: 'Styles 1' });
+    expect(api.code.list('css')[0]).toMatchObject({ kind: 'global', name: 'Styles 1' });
     tab('libraries').click();
     await tick();
     expect(panel().querySelector('.gjscr-section[data-kind="libraries"]')).toBeTruthy();
@@ -117,9 +118,8 @@ describe('code editor', () => {
     expect(overlay()).toBeNull();
   });
 
-  it('kind, run time and targets (pages of editor.Pages); the condition is checked', async () => {
+  it('run time; without site pages only Global; the condition is checked', async () => {
     const { editor, api } = await open();
-    (editor as any).Pages.add({ id: 'about', name: 'About', component: '<p>a</p>' });
     const c = api.code.create({ lang: 'js', name: 'X' });
     const view = editor.runCommand(COMMANDS.editCode, { id: c.id }) as CodeEditorView;
     const side = () => view.root.querySelector<HTMLElement>('.gjscr-ce-side')!;
@@ -128,22 +128,20 @@ describe('code editor', () => {
     run.dispatchEvent(new Event('change'));
     expect(api.code.get(c.id)!.run).toBe('load');
     const kind = side().querySelector<HTMLSelectElement>('select[aria-label="Type"]')!;
-    kind.value = 'template';
-    kind.dispatchEvent(new Event('change'));
-    expect(api.code.get(c.id)!.kind).toBe('template');
-    const about = side().querySelector<HTMLInputElement>('input[value="about"]')!;
-    about.checked = true;
-    about.dispatchEvent(new Event('change'));
-    expect(api.code.get(c.id)!.target!.pages).toEqual(['about']);
-    const when = side().querySelector<HTMLInputElement>('input[aria-label="Condition (CSS selector)"]')!;
+    expect(Array.from(kind.options).map((o) => o.value)).toEqual(['global']);
+    view.close();
+    // a unique item (from older data) still shows its conditions and the selector check
+    const u = api.code.create({ lang: 'js', kind: 'template', name: 'U' });
+    const v2 = editor.runCommand(COMMANDS.editCode, { id: u.id }) as CodeEditorView;
+    const when = v2.root.querySelector<HTMLInputElement>('input[aria-label="Condition (CSS selector)"]')!;
     when.value = 'div[';
     when.dispatchEvent(new Event('input'));
     expect(when.classList.contains('is-invalid')).toBe(true);
     when.value = 'body.x';
     when.dispatchEvent(new Event('input'));
-    view.flush();
-    expect(api.code.get(c.id)!.target).toEqual({ pages: ['about'], when: 'body.x' });
-    view.close();
+    v2.flush();
+    expect(api.code.get(u.id)!.target).toEqual({ pages: [], when: 'body.x' });
+    v2.close();
   });
 
   it('component JS: type, label, parameters; component CSS: picks a component type', async () => {

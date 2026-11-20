@@ -120,19 +120,70 @@ export interface PageScope {
   id: string;
   layoutId?: string | null;
   templateId?: string | null;
+  /** The record is a linked component of grapesjs-site-pages (not a page). */
+  kind?: string;
+  /** Linked components (grapesjs-site-pages) used on the page. */
+  components?: string[];
 }
 
+/** The page ids a scope answers to: the page, its layout, its template (not for a component record). */
 export const scopeIds = (s: PageScope | string | undefined): string[] => {
   if (!s) return [];
   if (typeof s === 'string') return [s];
+  if (s.kind === 'component') return [];
   return [s.id, s.layoutId, s.templateId].filter((x): x is string => !!x);
 };
 
-/** Is a `template` target meant for this page? Empty `pages` = every page. */
+/** The linked components a scope answers to: the component record itself and the ones it uses. */
+export const scopeComponents = (s: PageScope | string | undefined): string[] => {
+  if (!s || typeof s === 'string') return [];
+  return [...(s.kind === 'component' ? [s.id] : []), ...(s.components || [])];
+};
+
+/**
+ * A condition of a "unique" item (blueprint, JS, CSS, library): the page
+ * (with its layout and template) or a linked component of grapesjs-site-pages
+ * is / is not the given one. "Is" conditions are joined with OR, "is not"
+ * ones with AND.
+ */
+export interface ScopeRule {
+  on: 'page' | 'component';
+  op: 'eq' | 'ne';
+  id: string;
+}
+
+/**
+ * Rules are stored as strings in `target.pages` (blueprints, code) and
+ * `pages` (libraries), so stored data stays valid for blueprintsjs:
+ * `<id>` = page is, `!<id>` = page is not, `component:<id>`,
+ * `!component:<id>`. A plain id is what older versions stored.
+ */
+export function parseRule(s: string): ScopeRule {
+  const ne = s.startsWith('!');
+  const rest = ne ? s.slice(1) : s;
+  const comp = rest.startsWith('component:');
+  return { on: comp ? 'component' : 'page', op: ne ? 'ne' : 'eq', id: comp ? rest.slice('component:'.length) : rest };
+}
+
+export function ruleString(r: ScopeRule): string {
+  return `${r.op === 'ne' ? '!' : ''}${r.on === 'component' ? 'component:' : ''}${r.id}`;
+}
+
+export const parseRules = (list: string[] | undefined): ScopeRule[] => (list || []).filter(Boolean).map(parseRule);
+
+/**
+ * Is an item with these rules meant for this scope? No rules — everywhere.
+ * Any "is not" that holds excludes; when there are "is" rules, one must hold.
+ */
 export function targets(pages: string[] | undefined, scope: PageScope | string | undefined): boolean {
   if (!pages?.length) return true;
   const ids = scopeIds(scope);
-  return ids.some((id) => pages.includes(id));
+  const comps = scopeComponents(scope);
+  const holds = (r: ScopeRule) => (r.on === 'page' ? ids : comps).includes(r.id);
+  const rules = parseRules(pages);
+  if (rules.some((r) => r.op === 'ne' && holds(r))) return false;
+  const eqs = rules.filter((r) => r.op === 'eq');
+  return !eqs.length || eqs.some(holds);
 }
 
 /**

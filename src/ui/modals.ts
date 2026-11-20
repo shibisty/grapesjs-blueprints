@@ -5,7 +5,8 @@ import type { Translator } from '../i18n';
 import { contentSelect } from './content';
 import { h } from './dom';
 import type { ComponentSpecX } from '../integration/components';
-import { pagesComponents } from '../integration/pages';
+import { pagesComponents, type TargetChoice } from '../integration/pages';
+import { rulesEditor } from './rules';
 import { highlight } from './highlight';
 
 /** Pages of the project (`editor.Pages`): id and a readable name. */
@@ -48,7 +49,7 @@ export function openCreateDialog(
   editor: Editor,
   manager: ScriptsManager,
   t: Translator,
-  preset: { kind?: BlueprintKind } = {},
+  preset: { kind?: BlueprintKind; withPages?: boolean; choices?: () => TargetChoice[] } = {},
 ): Promise<CreateScriptInit | null> {
   return new Promise((resolve) => {
     let done = false;
@@ -59,10 +60,11 @@ export function openCreateDialog(
     };
     const pages = projectPages(editor);
     const name = h('input', { class: 'gjscr-input', type: 'text', id: 'gjscr-name', autocomplete: 'off', placeholder: t('defaultName') });
-    const kinds: BlueprintKind[] = ['global', 'template', 'component'];
+    // Global; Unique only with grapesjs-site-pages. New component scripts are no longer offered.
+    const kinds: BlueprintKind[] = preset.withPages ? ['global', 'template'] : ['global'];
     const labels: Record<BlueprintKind, [string, string]> = {
       global: [t('kindGlobal'), t('kindGlobalHint')],
-      template: [t('kindTemplate'), t('kindTemplateHint')],
+      template: [t('kindUnique'), t('kindUniqueHint')],
       component: [t('kindComponent'), t('kindComponentHint')],
     };
     const radios = kinds.map((k) =>
@@ -74,26 +76,23 @@ export function openCreateDialog(
       kinds.map((k, i) => h('label', { class: 'gjscr-kind' }, radios[i], h('span', {}, h('b', {}, labels[k][0]), h('small', {}, labels[k][1])))),
     );
 
-    // template
-    const allPages = h('input', { type: 'checkbox', checked: true, onchange: () => sync() });
-    const pageBoxes = pages.map((p) => ({ id: p.id, el: h('input', { type: 'checkbox', value: p.id }) }));
+    // unique: conditions (page / component is / is not)
+    let rules: string[] = [];
     const when = h('input', { class: 'gjscr-input', type: 'text', placeholder: 'body.tpl-product', autocomplete: 'off', spellcheck: 'false' });
     const templateBox = h(
       'div',
       {},
-      pages.length > 1
-        ? h(
-            'div',
-            { class: 'gjscr-field' },
-            h('span', { class: 'gjscr-label' }, t('pages')),
-            h(
-              'div',
-              { class: 'gjscr-pages' },
-              h('label', { class: 'gjscr-check' }, allPages, t('allPages')),
-              pageBoxes.map((b, i) => h('label', { class: 'gjscr-check' }, b.el, pages[i].name)),
-            ),
-          )
-        : null,
+      h(
+        'div',
+        { class: 'gjscr-field' },
+        h('span', { class: 'gjscr-label' }, t('conditions')),
+        rulesEditor({
+          t,
+          choices: preset.choices || (() => pages.map((p) => ({ id: p.id, name: p.name, group: 'page' as const }))),
+          value: [],
+          onChange: (v) => (rules = v),
+        }),
+      ),
       h('div', { class: 'gjscr-field' }, h('label', { for: 'gjscr-when' }, t('condition')), when, h('small', { class: 'gjscr-hint' }, t('conditionHint'))),
     );
     when.id = 'gjscr-when';
@@ -143,7 +142,6 @@ export function openCreateDialog(
     const sync = () => {
       templateBox.hidden = kind() !== 'template';
       componentBox.hidden = kind() !== 'component';
-      pageBoxes.forEach((b) => (b.el.disabled = allPages.checked));
       msg.textContent = '';
       suggestType();
     };
@@ -161,7 +159,7 @@ export function openCreateDialog(
           when.focus();
           return;
         }
-        init.target = { pages: allPages.checked ? [] : pageBoxes.filter((b) => b.el.checked).map((b) => b.id), ...(sel ? { when: sel } : {}) };
+        init.target = { pages: rules, ...(sel ? { when: sel } : {}) };
       }
       if (k === 'component') {
         const type = ctype.value.trim();
@@ -181,7 +179,7 @@ export function openCreateDialog(
       'form',
       { class: 'gjscr-modal', onsubmit: submit as EventListener, novalidate: true },
       h('div', { class: 'gjscr-field' }, h('label', { for: 'gjscr-name' }, t('name')), name),
-      h('div', { class: 'gjscr-field' }, h('span', { class: 'gjscr-label' }, t('kind')), kindBox),
+      kinds.length > 1 ? h('div', { class: 'gjscr-field' }, h('span', { class: 'gjscr-label' }, t('kind')), kindBox) : null,
       templateBox,
       componentBox,
       msg,
