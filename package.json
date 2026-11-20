@@ -1,13 +1,13 @@
 {
   "name": "grapesjs-blueprints",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "GrapesJS plugin: visual scripting with blueprints (node graphs compiled to plain JavaScript, powered by blueprintsjs), CDN libraries and script output settings.",
   "type": "module",
   "main": "./dist/grapesjs-scripts.umd.cjs",
   "module": "./dist/grapesjs-scripts.js",
   "types": "./dist/index.d.ts",
-  "unpkg": "./dist/grapesjs-scripts.umd.cjs",
-  "jsdelivr": "./dist/grapesjs-scripts.umd.cjs",
+  "unpkg": "./dist/grapesjs-scripts.umd.js",
+  "jsdelivr": "./dist/grapesjs-scripts.umd.js",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -24,7 +24,7 @@
   ],
   "sideEffects": false,
   "scripts": {
-    "build": "vite build && vite build --mode umd && tsc -p tsconfig.build.json",
+    "build": "vite build && vite build --mode umd && tsc -p tsconfig.build.json && node -e \"require('fs').copyFileSync('dist/grapesjs-scripts.umd.cjs','dist/grapesjs-scripts.umd.js')\"",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.test.json",
     "test": "vitest run",
     "test:watch": "vitest",

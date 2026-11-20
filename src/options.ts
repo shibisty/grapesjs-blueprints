@@ -82,7 +82,7 @@ export function resolveOptions(o: ScriptsPluginOptions = {}): ResolvedOptions {
 
 export const PLUGIN_ID = 'grapesjs-blueprints';
 /** Version of this package (a test checks it against package.json). */
-export const VERSION = '0.3.0';
+export const VERSION = '0.3.1';
 
 /** Options for forms (plugin contract). Changes apply after a reload. */
 export const META: PluginMeta = {
