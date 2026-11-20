@@ -51,6 +51,8 @@ describe('conditions: "is" with OR, "is not" with AND', () => {
     expect(targets(['!home'], home)).toBe(false);
     expect(targets(['!home'], blog)).toBe(true);
     expect(targets(['!home', '!blog'], blog)).toBe(false);
+    // a data record of a page (grapesjs-storage) answers to its page
+    expect(targets(['blog'], { id: 'item1', dataOf: 'blog' })).toBe(true);
   });
   it('component is / is not: the components on the page, or the component record itself', () => {
     expect(targets(['component:footer'], home)).toBe(true);

@@ -120,18 +120,20 @@ export interface PageScope {
   id: string;
   layoutId?: string | null;
   templateId?: string | null;
+  /** A data record (grapesjs-storage) of that page: rules about the page hold for it too. */
+  dataOf?: string | null;
   /** The record is a linked component of grapesjs-site-pages (not a page). */
   kind?: string;
   /** Linked components (grapesjs-site-pages) used on the page. */
   components?: string[];
 }
 
-/** The page ids a scope answers to: the page, its layout, its template (not for a component record). */
+/** The page ids a scope answers to: the page, its layout, its template, the page of a data record (not for a component record). */
 export const scopeIds = (s: PageScope | string | undefined): string[] => {
   if (!s) return [];
   if (typeof s === 'string') return [s];
   if (s.kind === 'component') return [];
-  return [s.id, s.layoutId, s.templateId].filter((x): x is string => !!x);
+  return [s.id, s.layoutId, s.templateId, s.dataOf].filter((x): x is string => !!x);
 };
 
 /** The linked components a scope answers to: the component record itself and the ones it uses. */

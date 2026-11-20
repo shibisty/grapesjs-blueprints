@@ -82,6 +82,8 @@ interface RecordLike {
   kind?: string;
   layoutId?: string | null;
   templateId?: string | null;
+  /** A data record (grapesjs-storage) of that page. */
+  dataOf?: string | null;
 }
 
 /**
@@ -112,7 +114,10 @@ export class ScopeTracker {
       this.offs.push(() => editor.off(ev, fn));
     };
     on('pages-manager:open', (r: RecordLike) => {
-      this.rec = r && typeof r.id === 'string' ? { id: r.id, kind: r.kind, layoutId: r.layoutId ?? null, templateId: r.templateId ?? null } : null;
+      this.rec =
+        r && typeof r.id === 'string'
+          ? { id: r.id, kind: r.kind, layoutId: r.layoutId ?? null, templateId: r.templateId ?? null, dataOf: r.dataOf ?? null }
+          : null;
     });
     on('pages-manager:detach', () => (this.rec = null));
     // The records change (created, renamed, deleted, synced): read the list again.
@@ -180,7 +185,13 @@ export class ScopeTracker {
   scope(pageId?: string): PageScope | undefined {
     if (pageId) return { id: pageId };
     if (this.rec) {
-      const s: PageScope = { id: this.rec.id, layoutId: this.rec.layoutId, templateId: this.rec.templateId, components: this.usedComponents() };
+      const s: PageScope = {
+        id: this.rec.id,
+        layoutId: this.rec.layoutId,
+        templateId: this.rec.templateId,
+        ...(this.rec.dataOf ? { dataOf: this.rec.dataOf } : {}),
+        components: this.usedComponents(),
+      };
       if (this.rec.kind === 'component') s.kind = 'component';
       return s;
     }

@@ -59,7 +59,7 @@ Without a bundler:
 
 Without grapesjs-site-pages everything is Global. With it, the Unique section appears for blueprints, JS, CSS and libraries. A condition is one of:
 
-- **page is / is not** a page, layout or template of pages (a layout or a template counts for every page in it);
+- **page is / is not** a page, layout or template of pages (a layout or a template counts for every page in it, a page for its data records of grapesjs-storage);
 - **component is / is not** a linked component of pages: true on a page that has the component on it, and in the component itself.
 
 "Is" conditions are joined with **OR** (any one is enough), "is not" ones with **AND** (each must hold). A Unique item with no conditions runs everywhere. Edit them in the new-script dialog, the code editor, the filter button of a list item, or from pages (*Scripts & styles* of a record).
