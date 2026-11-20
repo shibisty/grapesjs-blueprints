@@ -80,6 +80,8 @@ export class CssItems {
     private readonly editor: Editor,
     private readonly manager: ScriptsManager,
     private readonly scopeOf: () => PageScope | undefined,
+    /** More CSS to apply like items (the static CSS of the blueprints). */
+    private readonly extra: () => CodeItem[] = () => [],
   ) {
     this.wrapStore();
     const on = (ev: string, fn: (...a: any[]) => void) => {
@@ -158,7 +160,7 @@ export class CssItems {
   /** The CSS items that apply to the page shown, in order: global, the page's, components on it. */
   wanted(): CodeItem[] {
     const scope = this.scopeOf();
-    const all = this.manager.listCode('css').filter((c) => c.enabled);
+    const all = [...this.manager.listCode('css').filter((c) => c.enabled), ...this.extra()];
     const used = (type?: string) => !!type && componentInstances(this.editor, type).length > 0;
     return [
       ...all.filter((c) => c.kind === 'global'),

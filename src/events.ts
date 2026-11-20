@@ -37,6 +37,8 @@ export const COMMANDS = {
   export: 'scripts:export',
   /** Edit a JS/CSS item (a workspace tab or over the page). Options: `{ id }`. Returns the `CodeEditorView`. */
   editCode: 'scripts:edit-code',
+  /** Opens the page's own CSS (its GrapesJS styles as text, both ways). */
+  pageCss: 'scripts:page-css-edit',
   /** New JS/CSS item, opened for editing. Options: `{ lang: 'js' | 'css', kind? }`. */
   createCode: 'scripts:create-code',
   /** Build the page script. Options: `BuildPageOptions`. Returns `BuildResult`. */

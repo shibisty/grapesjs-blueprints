@@ -9,6 +9,9 @@ export interface CodeLabels {
   tabLibraries: string;
   newJs: string;
   newCss: string;
+  pageCss: string;
+  pageCssSub: string;
+  pageCssHint: string;
   defaultJsName: string;
   defaultCssName: string;
   emptyJs: string;
@@ -87,6 +90,9 @@ export const codeEn: CodeLabels = {
   tabLibraries: 'Libraries',
   newJs: 'New JavaScript',
   newCss: 'New styles',
+  pageCss: 'Page CSS',
+  pageCssSub: 'GrapesJS styles of this page',
+  pageCssHint: 'The page\'s own GrapesJS styles (Style Manager) as CSS: edit here and the Style Manager follows, style there and this text follows. Styles of CSS items and of linked components are not here.',
   defaultJsName: 'JavaScript',
   defaultCssName: 'Styles',
   emptyJs: 'No JavaScript yet. Create it with +.',
@@ -160,6 +166,9 @@ export const codeRu: CodeLabels = {
   tabLibraries: 'Библиотеки',
   newJs: 'Новый JavaScript',
   newCss: 'Новые стили',
+  pageCss: 'CSS страницы',
+  pageCssSub: 'стили GrapesJS этой страницы',
+  pageCssHint: 'Собственные стили GrapesJS этой страницы (Style Manager) в виде CSS: правка здесь меняет Style Manager, правка там — этот текст. Стили CSS-элементов и связанных компонентов сюда не входят.',
   defaultJsName: 'JavaScript',
   defaultCssName: 'Стили',
   emptyJs: 'JavaScript пока нет. Создайте его кнопкой +.',
@@ -233,6 +242,9 @@ export const codeUk: CodeLabels = {
   tabLibraries: 'Бібліотеки',
   newJs: 'Новий JavaScript',
   newCss: 'Нові стилі',
+  pageCss: 'CSS сторінки',
+  pageCssSub: 'стилі GrapesJS цієї сторінки',
+  pageCssHint: 'Власні стилі GrapesJS цієї сторінки (Style Manager) у вигляді CSS: правка тут змінює Style Manager, правка там — цей текст. Стилі CSS-елементів і пов’язаних компонентів сюди не входять.',
   defaultJsName: 'JavaScript',
   defaultCssName: 'Стилі',
   emptyJs: 'JavaScript поки немає. Створіть його кнопкою +.',

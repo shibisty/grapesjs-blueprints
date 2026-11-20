@@ -32,14 +32,14 @@ export interface CodeEditorOptions {
 }
 
 /** A code area: GrapesJS' CodeMirror when there is one, a textarea otherwise. */
-interface CodeArea {
+export interface CodeArea {
   el: HTMLElement;
   get(): string;
   set(v: string): void;
   refresh(): void;
 }
 
-function codeArea(editor: Editor, mode: 'javascript' | 'css' | 'htmlmixed', value: string, onChange: (v: string) => void, cls: string): CodeArea {
+export function codeArea(editor: Editor, mode: 'javascript' | 'css' | 'htmlmixed', value: string, onChange: (v: string) => void, cls: string): CodeArea {
   try {
     const cm = (editor as any).CodeManager;
     const viewer = cm?.createViewer?.({

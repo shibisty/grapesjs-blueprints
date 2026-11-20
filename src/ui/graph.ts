@@ -4,6 +4,7 @@ import { GraphEditor, type Text } from 'blueprintsjs/editor';
 import { isValidComponentType, type ScriptsManager } from '../core/ScriptsManager';
 import { getLocale, isRtlLocale } from '../i18n';
 import { locales as graphLocales } from 'blueprintsjs/locales';
+import { CSS_NODE_TEXTS } from '../i18n/cssNodes';
 import { componentOf, pickElement, selectorCandidates, suggestHookClass } from '../integration/picker';
 import type { Translator } from '../i18n';
 import { h } from './dom';
@@ -62,7 +63,7 @@ export async function pickSelectorFlow(editor: Editor, t: Translator, host: HTML
 export function graphText(editor: Editor, overrides: Record<string, string> = {}): Text {
   return (key, fallback, ...args) => {
     const lang = (getLocale(editor) || 'en').split('-')[0];
-    const msg = overrides[key] ?? graphLocales[lang]?.[key] ?? fallback;
+    const msg = overrides[key] ?? graphLocales[lang]?.[key] ?? CSS_NODE_TEXTS[lang]?.[key] ?? fallback;
     let i = 0;
     return msg.replace(/%s/g, () => String(args[i++] ?? ''));
   };

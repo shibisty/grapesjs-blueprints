@@ -21,6 +21,10 @@ import { rulesEditor } from './ui/rules';
 import { openRecordCodeDialog, recordRule, type RecordRef } from './ui/recordCode';
 import { contentSelect } from './ui/content';
 import { CssItems } from './integration/cssItems';
+import { CSS_NODES, RULE_NODE } from './blueprints/cssNodes';
+import { staticCss, type StaticCss } from './blueprints/blueprintCss';
+import { PageCss } from './integration/pageCss';
+import { PageCssEditorView } from './ui/pageCssEditor';
 import { openLibraryDialog } from './ui/libraries';
 import { CodeEditorView } from './ui/codeEditor';
 import { openCodeDialog, openCreateDialog, openModal } from './ui/modals';
@@ -119,12 +123,31 @@ function scriptsPlugin(editor: Editor, userOpts: ScriptsPluginOptions = {}): voi
   const offControl = registerControl(editor, META, () => publicOptions(opts), () => undefined);
   registerMessages(editor);
   const t: Translator = createTranslator(editor, opts.labels);
-  const registry = createRegistry(opts.nodes);
+  const registry = createRegistry([...CSS_NODES, ...opts.nodes]);
+  // Static CSS of the blueprints ("Apply to selector"), cached by graph.
+  const bpCss = new Map<string, { sig: string; res: StaticCss }>();
+  const staticOf = (bp: Blueprint): StaticCss => {
+    if (!bp.nodes.some((n) => n.type === RULE_NODE)) return { rules: [], css: '', problems: [] };
+    const sig = JSON.stringify([bp.nodes, bp.links, bp.variables]);
+    const hit = bpCss.get(bp.id);
+    if (hit && hit.sig === sig) return hit.res;
+    let root: unknown = null;
+    try {
+      root = editor.Canvas.getDocument?.() || null;
+    } catch {
+      root = null;
+    }
+    const res = staticCss(bp, registry, root || document);
+    bpCss.set(bp.id, { sig, res });
+    return res;
+  };
   const em: any = (editor as any).getModel?.();
 
   const manager = new ScriptsManager(registry, {
     defaultName: () => t('defaultName'),
     copySuffix: () => t('copySuffix'),
+    diagnostics: (bp) =>
+      staticOf(bp).problems.map((p) => ({ severity: 'warning' as const, code: 'static-css', message: p.message, args: [p.message], nodeId: p.nodeId })),
     onChange: (type, bp, code) => {
       if (!isAlive(editor)) return;
       if (type !== 'load') em?.changesUp?.({});
@@ -171,7 +194,20 @@ function scriptsPlugin(editor: Editor, userOpts: ScriptsPluginOptions = {}): voi
   const scopeOf = (component?: any): PageScope | undefined => (component && !tracker.withPages ? scopeFromPage(pageIdOf(editor, component)) : tracker.scope());
   runner = new CanvasRunner(editor, manager, registry, () => scopeOf());
   // CSS items as GrapesJS rules of the page shown (Style Manager, getCss, publish).
-  const cssItems = new CssItems(editor, manager, () => scopeOf());
+  const cssItems = new CssItems(editor, manager, () => scopeOf(), () =>
+    manager
+      .list()
+      .filter((b) => b.enabled)
+      .map((b): CodeItem | null => {
+        const { css } = staticOf(b);
+        if (!css) return null;
+        const target = b.kind === 'component' ? { componentType: b.component?.type } : b.kind === 'template' ? { pages: b.target?.pages || [] } : undefined;
+        return { id: `bp:${b.id}`, name: b.name, lang: 'css', kind: b.kind, enabled: true, code: css, target } as CodeItem;
+      })
+      .filter((c): c is CodeItem => !!c),
+  );
+  // The page's own GrapesJS styles as CSS, both ways.
+  const pageCss = new PageCss(editor);
   components = new ComponentBlueprints(editor, manager, registry, () => opts.blocksCategory || t('blocksCategory'));
   exporter = new ScriptsExporter(editor, manager, opts.output.tools || cdnTools(opts.output.urls), scopeOf);
   const http = { fetch: opts.libraries.fetch || ((u: string, i?: RequestInit) => fetch(u, i)), proxy: opts.libraries.proxy ?? false, timeout: opts.libraries.timeout };
@@ -301,6 +337,59 @@ function scriptsPlugin(editor: Editor, userOpts: ScriptsPluginOptions = {}): voi
     codeEditors.forEach((v) => !v.root.classList.contains('gjscr-ce--embedded') && v.close());
     return newCodeEditor(id);
   };
+
+  /** The page's own CSS: a workspace tab with grapesjs-sidebar-tools, else over the page. */
+  let pageCssView: PageCssEditorView | null = null;
+  const PAGE_CSS_DOC = 'code:page-css';
+  const pageTitle = (): string => {
+    const id = (editor as any).PagesManager?.getActiveId?.();
+    const name = id ? tracker.choices().find((c) => c.id === id)?.name : '';
+    return name ? `${t('pageCss')} · ${name}` : t('pageCss');
+  };
+  const newPageCss = (parent?: HTMLElement): PageCssEditorView => {
+    if (opts.injectCss) injectCss();
+    pageCssView = new PageCssEditorView(editor, pageCss, {
+      t,
+      parent,
+      title: pageTitle,
+      onClosed: () => {
+        pageCssView = null;
+        const ws = currentWorkspace(editor);
+        if (parent && ws?.has(PAGE_CSS_DOC) && !closingCodeTab) ws.close(PAGE_CSS_DOC, { force: true });
+      },
+    });
+    return pageCssView;
+  };
+  const editPageCss = (): void => {
+    const ws = opts.workspaceTabs ? currentWorkspace(editor) : null;
+    if (ws) {
+      if (ws.has(PAGE_CSS_DOC)) ws.activate(PAGE_CSS_DOC);
+      else
+        ws.open(
+          {
+            id: PAGE_CSS_DOC,
+            title: t('pageCss'),
+            tooltip: t('pageCssHint'),
+            kind: 'element',
+            mount: (container) => void newPageCss(container),
+            onShow: () => pageCssView?.refresh(),
+            onClosed: () => {
+              closingCodeTab = true;
+              try {
+                pageCssView?.close();
+              } finally {
+                closingCodeTab = false;
+              }
+            },
+          },
+          { activate: true },
+        );
+      return;
+    }
+    if (pageCssView) return;
+    newPageCss();
+  };
+  const offPageCssList = pageCss.onChange(() => sidebar?.render?.());
 
   const createCode = (lang: CodeLang, kind?: BlueprintKind): CodeItem => {
     const item = manager.createCode({ lang, kind });
@@ -551,6 +640,7 @@ function scriptsPlugin(editor: Editor, userOpts: ScriptsPluginOptions = {}): voi
   });
   editor.Commands.add(COMMANDS.code, { run: (_e: Editor, _s: unknown, o: { id?: string } = {}) => openCode(o.id) });
   editor.Commands.add(COMMANDS.settings, { run: () => openSettings() });
+  editor.Commands.add(COMMANDS.pageCss, { run: () => editPageCss() });
   editor.Commands.add(COMMANDS.editCode, { run: (_e: Editor, _s: unknown, o: { id?: string } = {}) => (o.id ? editCode(o.id) : null) });
   editor.Commands.add(COMMANDS.createCode, { run: (_e: Editor, _s: unknown, o: { lang?: CodeLang; kind?: BlueprintKind } = {}) => createCode(o.lang === 'css' ? 'css' : 'js', o.kind) });
   editor.Commands.add(COMMANDS.libraries, { run: () => addLibraryDialog() });
@@ -714,6 +804,9 @@ function scriptsPlugin(editor: Editor, userOpts: ScriptsPluginOptions = {}): voi
     codeEditors.clear();
     runner?.stop();
     cssItems.destroy();
+    offPageCssList();
+    pageCssView?.close();
+    pageCss.destroy();
     tracker.destroy();
     undoGetHtml?.();
     sidebar?.destroy();
@@ -790,6 +883,8 @@ function scriptsPlugin(editor: Editor, userOpts: ScriptsPluginOptions = {}): voi
       code: (id) => openCode(id),
       createCode: (lang, kind) => void createCode(lang, kind),
       editCode: (id) => void editor.runCommand(COMMANDS.editCode, { id }),
+      editPageCss: () => editor.runCommand(COMMANDS.pageCss),
+      pageCssCount: () => pageCss.count(),
       toggleCode: (id) => {
         const c = manager.getCode(id);
         if (c) manager.updateCode(id, { enabled: !c.enabled });

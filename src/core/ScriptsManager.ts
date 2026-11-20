@@ -107,6 +107,8 @@ export type CodeAction = 'add' | 'update' | 'remove' | 'move';
 export interface ManagerHooks {
   /** Something changed (payload for `scripts:*` events); `code` changes carry the item and the action. */
   onChange?(type: ChangeType, bp?: Blueprint, code?: { action: CodeAction; item: CodeItem }): void;
+  /** More problems of a script (the static CSS of its "Apply to selector" nodes). */
+  diagnostics?(bp: Blueprint): Diagnostic[];
   /** Base for automatic names ("Script" → "Script 1"). */
   defaultName?(): string;
   /** Suffix of duplicated names ("copy"). */
@@ -550,7 +552,7 @@ export class ScriptsManager {
   /** Validation + compiler problems of a script (duplicates merged). */
   diagnostics(id: string): Diagnostic[] {
     const bp = this.items[this.indexOf(id)];
-    const all = [...validateBlueprint(bp, this.registry), ...compileBlueprint(bp, this.registry).diagnostics];
+    const all = [...validateBlueprint(bp, this.registry), ...compileBlueprint(bp, this.registry).diagnostics, ...(this.hooks.diagnostics?.(bp) || [])];
     const seen = new Set<string>();
     return all.filter((d) => {
       const k = `${d.code}|${d.nodeId || ''}|${d.pinId || ''}|${d.message}`;

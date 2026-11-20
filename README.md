@@ -77,6 +77,18 @@ Conditions are stored as strings in `target.pages` (blueprints, JS, CSS) and `pa
 
 All 63 blocks: [nodes.md](https://unpkg.com/blueprintsjs/docs/nodes.md) ([по-русски](https://unpkg.com/blueprintsjs/docs/nodes.ru.md)) in the blueprintsjs docs.
 
+### Style blocks (CSS "shaders")
+
+The **Styles** category builds CSS the way a shader graph builds a material:
+
+- **Values** — *Color*, *Length* (16 + rem), *Mix colors*, *Lighten / darken*, *Transparency*, *HSL color*, *RGB color*, *Gradient*, *Shadow*, *CSS variable* (`var(--x, fallback)`), *Get style* (computed value). Wire them into each other and into the blocks below; Math, Text and variables work too.
+- **Apply to selector** — a static rule: selector, state (`:hover`, `::before`…), media (`(min-width: 768px)`) and a pin per property (`backgroundColor` → `background-color`, `__brand` → `--brand`). It has no exec pins: the editor computes the graph and the rule becomes part of the page CSS — the canvas, `editor.getCss()`, the publish and the Style Manager (a page's own rule for the same selector wins). It changes with the graph and goes away with the script, and it is never saved into the GrapesJS styles. Global / Unique / component conditions apply as for CSS items. A rule that reads something that only exists while the page runs (an action's output, an event) is reported in the script's problems.
+- **Apply styles** — the same rule set while the page runs (each run replaces it); without a selector it sets inline styles of the target (or the component root). **Set CSS variable** sets `--name` on the target (the page root by default), so every rule using `var(--name)` follows: themes, scroll effects.
+
+### Page CSS
+
+In the CSS list, **Page CSS** (first in Unique with grapesjs-site-pages, else in Global) is the page's own GrapesJS styles as CSS — what the Style Manager wrote, and the other way round: typing in it replaces the rules, a change in the Style Manager shows up in the text. CSS items and blueprint rules are not part of it.
+
 ### Blueprint editor
 
 | Action | How |

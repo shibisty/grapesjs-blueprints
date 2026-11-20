@@ -17,6 +17,9 @@ export interface SidebarActions {
   create(kind?: BlueprintKind): void;
   createCode(lang: CodeLang, kind?: BlueprintKind): void;
   editCode(id: string): void;
+  /** The page's own GrapesJS styles as CSS (both ways): opens its editor; how many rules. */
+  editPageCss?(): void;
+  pageCssCount?(): number;
   toggleCode(id: string): void;
   renameCode(id: string): void;
   duplicateCode(id: string): void;
@@ -316,17 +319,39 @@ export class Sidebar {
     const sectionTitle: Record<BlueprintKind, string> = { global: t('sectionGlobal'), template: t('sectionUnique'), component: t('sectionLegacy') };
     const kindName: Record<BlueprintKind, string> = { global: t('kindGlobal'), template: t('kindUnique'), component: t('kindComponent') };
     const newLabel = lang === 'js' ? t('newJs') : t('newCss');
+    // CSS: the page's own styles (GrapesJS rules) first — in "Unique" with pages, else in "Global".
+    const pageKind: BlueprintKind = this.actions.withPages?.() ? 'template' : 'global';
+    const pageEntry = (): HTMLElement | null =>
+      lang === 'css' && this.actions.editPageCss && (!q || t('pageCss').toLowerCase().includes(q))
+        ? h(
+            'li',
+            {
+              class: 'gjscr-item gjscr-item--page',
+              tabindex: 0,
+              'data-id': 'page-css',
+              'data-lang': 'css',
+              title: t('pageCssHint'),
+              onclick: () => this.actions.editPageCss!(),
+              onkeydown: (e: Event) => {
+                if ((e as KeyboardEvent).key === 'Enter') this.actions.editPageCss!();
+              },
+            },
+            h('span', { class: 'gjscr-dot' }),
+            h('div', { class: 'gjscr-main' }, h('div', { class: 'gjscr-name' }, t('pageCss')), h('div', { class: 'gjscr-sub' }, `${t('pageCssSub')} · ${t('cssRules', this.actions.pageCssCount?.() ?? 0)}`)),
+          )
+        : null;
     for (const kind of shownKinds(!!this.actions.withPages?.(), all)) {
       const items = shown.filter((c) => c.kind === kind);
-      if (q && !items.length) continue;
+      const page = kind === pageKind ? pageEntry() : null;
+      if (q && !items.length && !page) continue;
       const add =
         kind === 'component' || (kind === 'template' && !this.actions.withPages?.())
           ? null
           : h('button', { class: 'gjscr-act', type: 'button', title: `${newLabel}: ${kindName[kind]}`, onclick: () => this.actions.createCode(lang, kind) }, icon('plus', 14));
       frag.append(
         h('div', { class: 'gjscr-section', 'data-kind': kind }, h('span', {}, sectionTitle[kind], h('span', { class: 'gjscr-count' }, String(items.length))), add),
-        items.length
-          ? h('ul', { class: 'gjscr-list', role: 'list' }, items.map((c) => this.codeItem(c)))
+        items.length || page
+          ? h('ul', { class: 'gjscr-list', role: 'list' }, page, items.map((c) => this.codeItem(c)))
           : h('div', { class: 'gjscr-empty' }, !all.length && kind === 'global' ? (lang === 'js' ? t('emptyJs') : t('emptyCss')) : '—'),
       );
     }
