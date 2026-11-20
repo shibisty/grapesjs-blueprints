@@ -5,6 +5,8 @@ export { getScripts, PANEL_BUTTON_ID } from './plugin';
 export type { ScriptsApi } from './plugin';
 export { COMMANDS, EVENTS } from './events';
 export type { ScriptsPluginOptions } from './options';
+// `VERSION` stays the one of blueprintsjs (re-exported below); ours is PLUGIN_VERSION.
+export { META, VERSION as PLUGIN_VERSION } from './options';
 export { ScriptsManager, DEFAULT_SETTINGS, componentTypeFrom, isValidComponentType } from './core/ScriptsManager';
 export type { ScriptsData, ScriptsSettings, CreateScriptInit, BuildPageOptions, OutputMode, CodeAction } from './core/ScriptsManager';
 export { normalizeCode, starterCode, targets, scopeIds, jsSyntaxError } from './core/code';

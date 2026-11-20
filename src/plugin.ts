@@ -5,7 +5,8 @@ import { ScriptsManager, type BuildPageOptions, type CreateScriptInit, type Scri
 import type { CodeItem, CodeLang, CreateCodeInit, PageScope } from './core/code';
 import { COMMANDS, EVENTS } from './events';
 import { createTranslator, registerMessages, type Translator } from './i18n';
-import { resolveOptions, type ScriptsPluginOptions } from './options';
+import { META, publicOptions, resolveOptions, type ScriptsPluginOptions } from './options';
+import { definePlugin, registerControl } from './contract';
 import { h, icon, iconHtml } from './ui/dom';
 import { findHostPanel, findSidebarHost } from './ui/host';
 import { cdnTools } from './core/output';
@@ -109,11 +110,12 @@ const isAlive = (editor: Editor) => {
  * grapesjs-scripts: a "Scripts" view next to Layers/Styles. Scripts are blueprints (node graphs)
  * stored in the project data and compiled to plain JavaScript.
  */
-export default function scriptsPlugin(editor: Editor, userOpts: ScriptsPluginOptions = {}): void {
+function scriptsPlugin(editor: Editor, userOpts: ScriptsPluginOptions = {}): void {
   const ed = editor as EditorWithScripts;
   ed.__gjscrCleanup?.();
 
   const opts = resolveOptions(userOpts);
+  const offControl = registerControl(editor, META, () => publicOptions(opts), () => undefined);
   registerMessages(editor);
   const t: Translator = createTranslator(editor, opts.labels);
   const registry = createRegistry(opts.nodes);
@@ -651,6 +653,7 @@ export default function scriptsPlugin(editor: Editor, userOpts: ScriptsPluginOpt
   const cleanup = () => {
     if (disposed) return;
     disposed = true;
+    offControl();
     graph?.close();
     tabEditors.forEach((ge) => ge.close());
     tabEditors.clear();
@@ -790,6 +793,10 @@ export default function scriptsPlugin(editor: Editor, userOpts: ScriptsPluginOpt
     runner?.syncLibraries();
   });
 }
+
+definePlugin(scriptsPlugin, META);
+
+export default scriptsPlugin;
 
 function fileSafe(name: string): string {
   return name.replace(/[\\/:*?"<>|\s]+/g, '-').replace(/^-+|-+$/g, '') || 'script';

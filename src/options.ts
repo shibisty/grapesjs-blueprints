@@ -1,3 +1,4 @@
+import type { PluginMeta } from './contract';
 import type { NodeDef } from 'blueprintsjs';
 import type { OutputTools } from './core/output';
 import type { FetchLike } from './libs/providers';
@@ -7,6 +8,8 @@ export interface ScriptsPluginOptions {
   /** Panel with the view buttons (Layers/Styles…); auto-detected when null. */
   panelId?: string | null;
   /** CSS selector of the element the sidebar goes into; auto-detected when null. */
+  container?: string | null;
+  /** Older name of `container`. */
   sidebarContainer?: string | null;
   /** Your own nodes (same `type` as a built-in replaces it). */
   nodes?: NodeDef[];
@@ -49,7 +52,7 @@ export interface ScriptsPluginOptions {
   sharedWithPages?: boolean;
 }
 
-export type ResolvedOptions = Required<Omit<ScriptsPluginOptions, 'labels' | 'nodes' | 'graphLabels' | 'libraries' | 'output' | 'blocksCategory'>> & {
+export type ResolvedOptions = Required<Omit<ScriptsPluginOptions, 'labels' | 'nodes' | 'graphLabels' | 'libraries' | 'output' | 'blocksCategory' | 'container'>> & {
   libraries: NonNullable<ScriptsPluginOptions['libraries']>;
   output: NonNullable<ScriptsPluginOptions['output']>;
   blocksCategory?: string;
@@ -61,9 +64,9 @@ export type ResolvedOptions = Required<Omit<ScriptsPluginOptions, 'labels' | 'no
 export function resolveOptions(o: ScriptsPluginOptions = {}): ResolvedOptions {
   return {
     panelId: o.panelId ?? null,
-    sidebarContainer: o.sidebarContainer ?? null,
+    sidebarContainer: o.container ?? o.sidebarContainer ?? null,
     nodes: Array.isArray(o.nodes) ? o.nodes : [],
-    labels: o.labels || {},
+    labels: { ...(o.labels || {}) },
     graphLabels: o.graphLabels || {},
     injectCss: o.injectCss !== false,
     storageKey: o.storageKey || 'scripts',
@@ -75,4 +78,61 @@ export function resolveOptions(o: ScriptsPluginOptions = {}): ResolvedOptions {
     sharedWithPages: o.sharedWithPages !== false,
     blocksCategory: o.blocksCategory,
   } as ResolvedOptions;
+}
+
+export const PLUGIN_ID = 'grapesjs-blueprints';
+/** Version of this package (a test checks it against package.json). */
+export const VERSION = '0.3.0';
+
+/** Options for forms (plugin contract). Changes apply after a reload. */
+export const META: PluginMeta = {
+  id: PLUGIN_ID,
+  version: VERSION,
+  title: 'Blueprints',
+  description: 'Visual scripts (blueprints), JavaScript and CSS of the site, CDN libraries.',
+  options: [
+    {
+      key: 'libraries',
+      type: 'json',
+      default: {},
+      title: 'Library search',
+      description: '{ "proxy": "/plugins/grapesjs-scripts/proxy/libs-proxy.php", "timeout": 15000 }',
+    },
+    { key: 'preview', type: 'boolean', default: true, title: 'Run scripts in the preview' },
+    { key: 'exportHtml', type: 'boolean', default: true, title: 'Script tags in getHtml()' },
+    { key: 'workspaceTabs', type: 'boolean', default: true, title: 'Editors as workspace tabs', description: 'With grapesjs-sidebar-tools.' },
+    { key: 'sharedWithPages', type: 'boolean', default: true, title: 'One set of scripts per site', description: 'With grapesjs-site-pages 2.7+.' },
+    { key: 'blocksCategory', type: 'string', default: '', title: 'Block category of components', description: 'Empty — "Scripts".' },
+    { key: 'output', type: 'json', default: {}, title: 'Minify/obfuscate tools', description: '{ "urls": { "terser": "…", "obfuscator": "…" } }', advanced: true },
+    { key: 'storageKey', type: 'string', default: 'scripts', title: 'Key in the project data', advanced: true },
+    { key: 'panelId', type: 'string', default: '', title: 'Panel of the "Scripts" button', description: 'Empty — auto.', advanced: true },
+    { key: 'container', type: 'string', default: '', title: 'Sidebar container (CSS selector)', description: 'Empty — auto.', aliases: ['sidebarContainer'], advanced: true },
+    { key: 'labels', type: 'json', default: {}, title: 'Texts', advanced: true },
+    { key: 'graphLabels', type: 'json', default: {}, title: 'Graph editor texts', advanced: true },
+    { key: 'injectCss', type: 'boolean', default: true, title: 'Inject CSS', advanced: true },
+  ],
+};
+
+/** The options a form can show (no functions or node definitions). */
+export function publicOptions(o: ResolvedOptions): Record<string, unknown> {
+  const libs = o.libraries || {};
+  const out = o.output || {};
+  return {
+    libraries: {
+      ...(libs.proxy !== undefined ? { proxy: libs.proxy } : {}),
+      ...(libs.timeout !== undefined ? { timeout: libs.timeout } : {}),
+    },
+    preview: o.preview,
+    exportHtml: o.exportHtml,
+    workspaceTabs: o.workspaceTabs,
+    sharedWithPages: o.sharedWithPages,
+    blocksCategory: o.blocksCategory || '',
+    output: out.urls ? { urls: { ...out.urls } } : {},
+    storageKey: o.storageKey,
+    panelId: o.panelId || '',
+    container: o.sidebarContainer || '',
+    labels: { ...o.labels },
+    graphLabels: { ...o.graphLabels },
+    injectCss: o.injectCss,
+  };
 }
